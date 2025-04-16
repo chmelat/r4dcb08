@@ -18,6 +18,8 @@
 #include "packet.h"
 #include "monada.h"
 #include "revision.h"
+#include "define_error_resp.h"
+#include "median_filter.h"
 
 /* Local define */
 #define PORT "/dev/ttyUSB0"  /* Linux */
@@ -46,7 +48,7 @@ typedef enum {
 volatile sig_atomic_t running = 1;
 
 /* Local function declarations */
-static void read_temp(int fd, uint8_t adr, int n, int dt);
+static void read_temp(int fd, uint8_t adr, int n, int dt, int m_f);
 static void read_correction(int fd, uint8_t adr);
 static int write_address(int fd, uint8_t adr, uint8_t n_adr);
 static int write_baudrate(int fd, uint8_t adr, uint8_t cbr);
@@ -73,6 +75,7 @@ int main(int argc, char *argv[])
     int ct = 0;        /* Read and print correction temperature */
     uint8_t n_adr = 0; /* Write new device address */
     uint8_t cbr = BAUD_INVALID; /* Code for baudrate */
+    int m_f = 0;        /* Disable/Enable three point median filter */
 
     int ch = -1;       /* Channel */
     float T_c = 0.0;   /* Correction temperature */
@@ -80,7 +83,7 @@ int main(int argc, char *argv[])
     progname = basename(argv[0]);
 
     /* Command line options */
-    while ((c = getopt(argc, argv, "p:a:b:t:n:cw:s:x:h?")) != -1) {
+    while ((c = getopt(argc, argv, "p:a:b:t:n:cw:s:x:mh?")) != -1) {
         switch (c) {
             case 'p':  /* Port name */
                 port = optarg;
@@ -96,8 +99,8 @@ int main(int argc, char *argv[])
                 break;
             case 't':  /* delta time */
                 dt = atoi(optarg);
-                if (dt <= 0) {
-                    fprintf(stderr, "Time step must be positive!\n");
+                if (dt < 0) {
+                    fprintf(stderr, "Time step must be positive or zero!\n");
                     exit(EXIT_FAILURE);
                 }
                 break;
@@ -133,6 +136,9 @@ int main(int argc, char *argv[])
                     fprintf(stderr, "Invalid code baudrate (%d) in -x option!\n", cbr);
                     exit(EXIT_FAILURE);
                 }
+                break;
+            case 'm':  /* Enable three point median filter */
+                m_f = 1;
                 break;
             case 'h':  /* Help */
                 help();
@@ -189,8 +195,10 @@ int main(int argc, char *argv[])
         exit(EXIT_SUCCESS);
     }
 
+    if (m_f) printf("# Active three-point median filter for all data ...\n#\n");
+
     /* Default action - read temperature */
-    read_temp(fd, adr, n, dt);
+    read_temp(fd, adr, n, dt, m_f);
 
     fflush(stdout);  /* Flush stdout */
     close(fd);       /* Close port */
@@ -201,7 +209,7 @@ int main(int argc, char *argv[])
 /*
  *  Read and print temperature 1..n channel
  */
-static void read_temp(int fd, uint8_t adr, int n, int dt)
+static void read_temp(int fd, uint8_t adr, int n, int dt, int m_f)
 {
     int verb = 0;
     PACKET pr;
@@ -209,7 +217,11 @@ static void read_temp(int fd, uint8_t adr, int n, int dt)
     uint8_t *p_data;
     uint8_t input_data[DMAX];
     int i;
-    float T;
+    int rc;
+    float T[MAX_CHANNELS];
+    float T_f[MAX_CHANNELS];
+    char *sample_time = NULL;
+    char sample_t_f[DBUF];  /* Sample time after filtering */
 
     /* Set up signal handler for clean termination */
     signal(SIGINT, handle_signal);
@@ -229,13 +241,34 @@ static void read_temp(int fd, uint8_t adr, int n, int dt)
     /* Modified loop to allow termination with Ctrl+C */
     while (running) {
         p_data = monada(fd, adr, '\x03', 4, input_data, p_pr, verb, "read_temp", 0);
-        printf("%s ", now());
+
+        sample_time = now();
+
         for (i=0; i<n; i++) {
-            T = (float)INT16(p_data[2*i+1], p_data[2*i])/10; /* Temperature [C] */
-            if (T > MIN_TEMPERATURE && T < MAX_TEMPERATURE)
-                printf(" %.1f", T);
-            else
-                printf("  NaN");
+            T[i] = (float)INT16(p_data[2*i+1], p_data[2*i])/10; /* Temperature [C] */
+            if (T[i] < MIN_TEMPERATURE || T[i] > MAX_TEMPERATURE)
+              T[i] = ERRRESP;
+        }
+
+        if (m_f) {
+          rc = median_filter(sample_time, n, T, sample_t_f,T_f);
+          if (rc != MF_SUCCESS) {
+            fprintf(stderr, "Median filter failed with code %d\n", rc);
+            exit (EXIT_FAILURE);
+          }
+          strcpy(sample_time, sample_t_f);
+          for (i=0; i<n; i++) {
+            T[i] = T_f[i];
+          }
+        }
+
+        
+        printf("%s ", sample_time);
+        for (i=0; i<n; i++) {
+          if (T[i] != ERRRESP) 
+            printf(" %.1f", T[i]);
+          else
+            printf("  NaN");
         }
         printf("\n");
         usleep((useconds_t)(dt*1E6));
@@ -456,6 +489,7 @@ static void help(void)
         "-b [n]\t\tSet baud rate serial port {1200, 2400, 4800, 9600, 19200}, def. 9600",
         "-x [n]\t\tSet baud rate on R4DCB08 device {0:1200, 1:2400, 2:4800, 3:9600, 4:19200}, def. 9600",
         "-s [ch,Tc]\tSet temperature correction Tc for channel ch",
+        "-m\t\tEnable three point median filter",
         0
     };
   

@@ -2,13 +2,13 @@
 # Makefile
 #
 
-PROGRAM=modbus
+PROGRAM=r4dcb08
 VERSION=0.1
 
 # Files
-SRC=packet.c serial.c monada.c now.c main.c
+SRC=packet.c serial.c monada.c now.c median_filter.c main.c
 OBJ=$(SRC:.c=.o)
-HEAD=typedef.h revision.h packet.h serial.h monada.h now.h
+HEAD=typedef.h revision.h define_error_resp.h packet.h serial.h monada.h now.h median_filter.h
 
 
 # C compiler
