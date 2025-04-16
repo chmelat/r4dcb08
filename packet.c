@@ -1,212 +1,335 @@
 /*
- *  Function for packet handling in rtu modbus protocol
+ *  Functions for packet handling in Modbus RTU protocol
  *  V1.0/2025-01-30
  *  V1.1/2025-03-28 Adaptation for R4DCB08 device
+ *  V1.2/2025-04-16 Code improvements and robustness enhancements
  */
-#include <stdio.h>  /* Standard input/output definitions */
+#include <stdio.h>   /* Standard input/output definitions */
 #include <stdlib.h>  /* Standard library */
 #include <unistd.h>  /* UNIX standard function definitions */
 #include <stdint.h>  /* Specific width integer types */
+#include <string.h>  /* String functions */
+#include <errno.h>   /* Error numbers */
 
-#include "typedef.h"  /* definice datovych typu */
-#include "packet.h"  /* deklarace globalnich fci */
+#include "typedef.h" /* Data type definitions */
+#include "packet.h"  /* Global function declarations */
 
-/* Maximalni delka dat DMAX je definovan v typedef.h */
+/* Configuration constants */
+#define READ_TIMEOUT_MS    500   /* Timeout for reading operations in milliseconds */
+#define MIN_PACKET_SIZE    4     /* Minimum valid packet size: ADDR + FUNC + CRC(2) */
+#define MAX_PACKET_SIZE    (DMAX + 4) /* Maximum valid packet size */
+
+/* Error messages */
+#define ERR_INVALID_LENGTH "Invalid data length"
+#define ERR_INVALID_MODE   "Invalid receive mode"
+#define ERR_CRC_MISMATCH   "CRC verification failed"
+#define ERR_DATA_OVERFLOW  "Data length exceeds maximum"
+#define ERR_WRITE_FAILED   "Failed to write packet to port"
 
 /*
- *  Funkcni prototypy lokalnich fci
+ *  Local function prototypes
  */
-static uint16_t CRC16_2(uint8_t *buf, int len);
+static uint16_t CRC16_2(const uint8_t *buf, int len);
+static int read_with_timeout(int fd, uint8_t *buffer, int size, int timeout_ms);
 
 /**********************************************************************/
 
 /*
- *  Packet received
- *  mode 0 packet from temperature read
- *       1 aknown packet from set temp. correction or baudrate
+ *  Receive a packet from the device
  */
-int received_packet (int fd, PACKET *p_RP, int mode)
+int received_packet(int fd, PACKET *p_RP, int mode)
 {
-  char msg[] = "received_packet";
-  uint8_t buf[DMAX+4];
-  uint8_t tmp[1];
-  int res;  /* Number of read data */
-  int i=1;
-  int j;
-  uint16_t crc_c;  /* Compute  CRC */
-  int len;
+    const char *msg = "received_packet";
+    uint8_t buf[MAX_PACKET_SIZE];
+    int bytes_read = 0;
+    int total_length = 0;
+    uint16_t crc_calculated;
+    int i;
 
-/* Wait for first character of packet (adr) */
-  for(;;) {
-    res = read(fd, tmp, 1);
-    if (res == 1) {
-      buf[0] = tmp[0];
-      break;
+    /* Validate input parameters */
+    if (p_RP == NULL) {
+        fprintf(stderr, "%s: NULL packet pointer\n", msg);
+        return -1;
     }
-  }
 
-  if (mode == 0) {  
-/* Read two bytes (fce + len) */  
-  while ( i < 3 ) {
-    res = read(fd, tmp, 1);
-    if (res == 1) {
-      buf[i++] = tmp[0];
-    } else
-      break;
-  }
-  len = buf[2];
-
-/* Nacteni zbytku ramce (data + crc) */
-  while ( i < len+5 ) {
-    res = read(fd, tmp, 1);
-    if (res == 1) {
-      buf[i++] = tmp[0];
-    } else
-      break;
-  }
-  if (i != len+5) {
-    fprintf(stderr, "%s: Incorrect data lenght, mode 0!\n",msg);
-    return (-1);
-  }
-  } else if (mode == 1) {
-/* Nacteni zbytku ramce */
-    while ( i < 8 ) {
-      res = read(fd, tmp, 1);
-      if (res == 1) {
-        buf[i++] = tmp[0];
-      } else
-        break;
+    if (mode < 0 || mode >= RECEIVE_MODE_MAX) {
+        fprintf(stderr, "%s: %s (%d)\n", msg, ERR_INVALID_MODE, mode);
+        return -2;
     }
-    if (i != 8) {
-      fprintf(stderr, "%s: Incorrect data lenght, mode 1!\n",msg);
-      return (-1);
+
+    /* Read first byte (address) */
+    bytes_read = read_with_timeout(fd, buf, 1, READ_TIMEOUT_MS);
+    if (bytes_read != 1) {
+        fprintf(stderr, "%s: Timeout waiting for address byte\n", msg);
+        return -1;
     }
-    len = 2;
-  } else {
-    return -2; /* unknown mode */
-  }
 
+    /* Determine expected packet length based on mode */
+    if (mode == RECEIVE_MODE_TEMPERATURE) {
+        /* Read function code + length */
+        bytes_read = read_with_timeout(fd, buf + 1, 2, READ_TIMEOUT_MS);
+        if (bytes_read != 2) {
+            fprintf(stderr, "%s: Timeout waiting for function and length bytes\n", msg);
+            return -1;
+        }
 
-  p_RP->addr = buf[0];
-  p_RP->inst = buf[1];
-  p_RP->len = len;
-  for (j=0; j<len; j++) {
-    if (mode == 0)
-      p_RP->data[j] = buf[j+3];
-    else
-      p_RP->data[j] = buf[j+4];
-  }
-  p_RP->CRC = UINT16(buf[i-2],buf[i-1]);
+        /* Calculate total expected length */
+        total_length = buf[2] + 5; /* ADDR + FUNC + LEN + DATA + CRC(2) */
+        
+        /* Validate expected length */
+        if (total_length < MIN_PACKET_SIZE || total_length > MAX_PACKET_SIZE) {
+            fprintf(stderr, "%s: %s, invalid total length: %d\n", 
+                    msg, ERR_INVALID_LENGTH, total_length);
+            return -1;
+        }
 
-/* CRC test */ 
-  if (mode == 0) 
-    crc_c = CRC16_2(buf, len+3);
-  else
-    crc_c = CRC16_2(buf, len+4);
+        /* Read remaining data and CRC */
+        bytes_read = read_with_timeout(fd, buf + 3, total_length - 3, READ_TIMEOUT_MS);
+        if (bytes_read != total_length - 3) {
+            fprintf(stderr, "%s: %s, expected %d bytes, got %d\n", 
+                    msg, ERR_INVALID_LENGTH, total_length - 3, bytes_read);
+            return -1;
+        }
+    } 
+    else if (mode == RECEIVE_MODE_ACKNOWLEDGE) {
+        /* Read remaining 7 bytes for acknowledge packet */
+        bytes_read = read_with_timeout(fd, buf + 1, 7, READ_TIMEOUT_MS);
+        if (bytes_read != 7) {
+            fprintf(stderr, "%s: %s, expected 7 bytes, got %d\n", 
+                    msg, ERR_INVALID_LENGTH, bytes_read);
+            return -1;
+        }
+        total_length = 8;  /* Fixed length for acknowledge packet */
+    }
 
-  if (crc_c != p_RP->CRC) {
-    fprintf(stderr, "%s: Incorrect CRC, %x != %x!\n",msg, crc_c, p_RP->CRC);
-    print_packet(p_RP);
-    return (-1);
-  }
+    /* Extract packet fields */
+    p_RP->addr = buf[0];
+    p_RP->inst = buf[1];
+    
+    if (mode == RECEIVE_MODE_TEMPERATURE) {
+        p_RP->len = buf[2];
+        /* Copy data bytes */
+        for (i = 0; i < p_RP->len && i < DMAX; i++) {
+            p_RP->data[i] = buf[i + 3];
+        }
+        /* Extract CRC */
+        p_RP->CRC = UINT16(buf[total_length - 2], buf[total_length - 1]);
+        
+        /* Verify CRC */
+        crc_calculated = CRC16_2(buf, p_RP->len + 3);
+    } 
+    else { /* RECEIVE_MODE_ACKNOWLEDGE */
+        p_RP->len = 2;  /* Fixed data length for acknowledge */
+        /* Copy data bytes - position is different for acknowledge packets */
+        for (i = 0; i < p_RP->len && i < DMAX; i++) {
+            p_RP->data[i] = buf[i + 4];
+        }
+        /* Extract CRC */
+        p_RP->CRC = UINT16(buf[total_length - 2], buf[total_length - 1]);
+        
+        /* Verify CRC */
+        crc_calculated = CRC16_2(buf, p_RP->len + 4);
+    }
 
-/* Prodleva, jinak se pri nulovem case cteni hrouti  */  
-  usleep((useconds_t)(8E3));
+    /* Check if calculated CRC matches received CRC */
+    if (crc_calculated != p_RP->CRC) {
+        fprintf(stderr, "%s: %s, calculated: 0x%04X, received: 0x%04X\n", 
+                msg, ERR_CRC_MISMATCH, crc_calculated, p_RP->CRC);
+        print_packet(p_RP);
+        return -1;
+    }
 
-  return 0;
+    /* Small delay to ensure stable operation */
+    usleep((useconds_t)(8000));
+
+    return 0;
 }
 
 /*
- *  Send packet 'p_SP' to device 'fd' (write)
+ *  Send a packet to the device
  */
-int send_packet (int fd, PACKET *p_SP)
+int send_packet(int fd, PACKET *p_SP)
 {
-  char msg[] = "send_packet";
-  uint8_t buf[DMAX+4];  /* Buffer with send data */
-  int i;
+    const char *msg = "send_packet";
+    uint8_t buf[MAX_PACKET_SIZE];
+    int i;
 
-  if (p_SP->len > DMAX) {
-    fprintf(stderr, "%s: Overflow length of data (%u > %d).\n", msg, p_SP->len, DMAX);
-    return (-1);
-  }
+    /* Validate input parameters */
+    if (p_SP == NULL) {
+        fprintf(stderr, "%s: NULL packet pointer\n", msg);
+        return -1;
+    }
 
-/*  Packet formulation  */
-  buf[0] = p_SP->addr;  /* Address */
-  buf[1] = p_SP->inst;  /* Instruction */
-  for (i = 0; i < p_SP->len; i++)
-    buf[i+2] = p_SP->data[i];
-  buf[p_SP->len+2] = ( p_SP->CRC & 0xFF ); /* CRC_lo */
-  buf[p_SP->len+3] = ( p_SP->CRC >> 8 );   /* CRC_hi */
+    if (p_SP->len > DMAX) {
+        fprintf(stderr, "%s: %s (%u > %d)\n", msg, ERR_DATA_OVERFLOW, p_SP->len, DMAX);
+        return -1;
+    }
 
-/* Write packet to fd */  
-  if (write (fd, buf, p_SP->len+4) < 0) {
-    fprintf(stderr, "%s: It is impossible send packet to port.\n", msg);
-    return (-1);
-  }
-  else
-    return p_SP->len;  /* Lenght of corect send data */
+    /* Assemble packet */
+    buf[0] = p_SP->addr;  /* Address */
+    buf[1] = p_SP->inst;  /* Instruction */
+    
+    /* Copy data */
+    for (i = 0; i < p_SP->len && i < DMAX; i++) {
+        buf[i + 2] = p_SP->data[i];
+    }
+    
+    /* Add CRC */
+    buf[p_SP->len + 2] = (p_SP->CRC & 0xFF);     /* CRC_lo */
+    buf[p_SP->len + 3] = ((p_SP->CRC >> 8) & 0xFF); /* CRC_hi */
+
+    /* Write packet to device */
+    if (write(fd, buf, p_SP->len + 4) < 0) {
+        fprintf(stderr, "%s: %s (errno: %d, %s)\n", 
+                msg, ERR_WRITE_FAILED, errno, strerror(errno));
+        return -1;
+    }
+    
+    return p_SP->len;  /* Return length of correctly sent data */
 }
 
 /*
- *  Packet assembly
+ *  Form a packet with given parameters
  */
-void form_packet (uint8_t addr, uint8_t inst, uint8_t *p_data,
-                  int len, PACKET *p_Packet)
+void form_packet(uint8_t addr, uint8_t inst, uint8_t *p_data,
+                 int len, PACKET *p_Packet)
 {
-  int i;
-  uint8_t buf[DMAX+4];  /* Buffer */
-  uint16_t crc_c; /* CRC */
-  
-  p_Packet->addr = addr;  /* Address */
-  p_Packet->inst = inst;    /* Instruction code */
-  p_Packet->len = len;    /* Lenght of data */
-  buf[0] = addr;
-  buf[1] = inst;
-  for (i = 0; i < len; i++) {     /* Data */
-    p_Packet->data[i] = *p_data;
-    buf[i+2] = *p_data++;
-  }
-
-  crc_c = CRC16_2(buf, i+2); /* CRC */
-  p_Packet->CRC = crc_c;
+    uint8_t buf[MAX_PACKET_SIZE];
+    uint16_t crc_calculated;
+    int i;
+    
+    /* Validate input parameters */
+    if (p_Packet == NULL || p_data == NULL || len < 0 || len > DMAX) {
+        fprintf(stderr, "form_packet: Invalid parameters\n");
+        return;
+    }
+    
+    /* Fill packet structure */
+    p_Packet->addr = addr;
+    p_Packet->inst = inst;
+    p_Packet->len = len;
+    
+    /* Assemble buffer for CRC calculation */
+    buf[0] = addr;
+    buf[1] = inst;
+    
+    /* Copy data */
+    for (i = 0; i < len; i++) {
+        p_Packet->data[i] = p_data[i];
+        buf[i + 2] = p_data[i];
+    }
+    
+    /* Calculate and set CRC */
+    crc_calculated = CRC16_2(buf, len + 2);
+    p_Packet->CRC = crc_calculated;
 }
 
 /*
- *  Print packet 'p_P' on terminal
+ *  Print packet contents to stdout
  */
 void print_packet(PACKET *p_P)
 {
-  int i;
+    int i;
 
-  printf("ADR INS DATA... CRC CRC\n");
-  printf("%02X %02X ",p_P->addr, p_P->inst);
-  for (i = 0; i<p_P->len; i++)
-    printf("%02X ", p_P->data[i]);
-  printf("%02X %02X\n",(p_P->CRC) & 0xFF, (p_P->CRC) >> 8);
+    /* Validate input parameter */
+    if (p_P == NULL) {
+        fprintf(stderr, "print_packet: NULL packet pointer\n");
+        return;
+    }
+
+    printf("ADR INS DATA... CRC CRC\n");
+    printf("%02X %02X ", p_P->addr, p_P->inst);
+    
+    for (i = 0; i < p_P->len; i++) {
+        printf("%02X ", p_P->data[i]);
+    }
+    
+    printf("%02X %02X\n", (p_P->CRC) & 0xFF, (p_P->CRC) >> 8);
 }
-
 
 /* Local functions */
 
 /*
- *  Modbus CRC
+ *  Calculate Modbus CRC16
  */
-
-static uint16_t CRC16_2(uint8_t *buf, int len)
+static uint16_t CRC16_2(const uint8_t *buf, int len)
 { 
-  uint16_t crc = 0xFFFF;
-  for (int pos = 0; pos < len; pos++)
-  {
-  crc ^= (uint16_t)buf[pos];    // XOR byte into least sig. byte of crc
+    uint16_t crc = 0xFFFF;
+    
+    /* Validate input parameters */
+    if (buf == NULL || len <= 0) {
+        return 0;
+    }
+    
+    for (int pos = 0; pos < len; pos++) {
+        crc ^= (uint16_t)buf[pos];    /* XOR byte into least sig. byte of crc */
 
-  for (int i = 8; i != 0; i--) {    // Loop over each bit
-    if ((crc & 0x0001) != 0) {      // If the LSB is set
-      crc >>= 1;                    // Shift right and XOR 0xA001
-      crc ^= 0xA001;
+        for (int i = 8; i != 0; i--) {    /* Loop over each bit */
+            if ((crc & 0x0001) != 0) {    /* If the LSB is set */
+                crc >>= 1;                /* Shift right and XOR 0xA001 */
+                crc ^= 0xA001;
+            }
+            else {                        /* Else LSB is not set */
+                crc >>= 1;                /* Just shift right */
+            }
+        }
     }
-    else                            // Else LSB is not set
-      crc >>= 1;                    // Just shift right
+    
+    return crc;
+}
+
+/*
+ *  Read data with timeout
+ */
+static int read_with_timeout(int fd, uint8_t *buffer, int size, int timeout_ms)
+{
+    fd_set readfds;
+    struct timeval tv;
+    int bytes_read = 0;
+    int result;
+    
+    /* Validate input parameters */
+    if (buffer == NULL || size <= 0) {
+        return 0;
     }
-  }
-  return crc;
+    
+    while (bytes_read < size) {
+        /* Set up for select */
+        FD_ZERO(&readfds);
+        FD_SET(fd, &readfds);
+        
+        /* Set timeout */
+        tv.tv_sec = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
+        
+        /* Wait for data or timeout */
+        result = select(fd + 1, &readfds, NULL, NULL, &tv);
+        
+        if (result < 0) {
+            /* Error in select */
+            fprintf(stderr, "read_with_timeout: select error: %s\n", strerror(errno));
+            return bytes_read;
+        } 
+        else if (result == 0) {
+            /* Timeout */
+            return bytes_read;
+        }
+        
+        /* Data available, read it */
+        result = read(fd, buffer + bytes_read, size - bytes_read);
+        
+        if (result < 0) {
+            /* Read error */
+            fprintf(stderr, "read_with_timeout: read error: %s\n", strerror(errno));
+            return bytes_read;
+        } 
+        else if (result == 0) {
+            /* End of file */
+            return bytes_read;
+        }
+        
+        bytes_read += result;
+    }
+    
+    return bytes_read;
 }

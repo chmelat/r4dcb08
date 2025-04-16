@@ -8,6 +8,7 @@
 #define INT16(lo,hi) ( (int16_t)((uint16_t)(lo) + 256*(uint16_t)(hi)) ) 
 
 #define VERBOSE 0
+//#define DEBUG
 
 /*
  *  Modbus RTU frame
