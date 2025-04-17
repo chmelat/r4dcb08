@@ -3,7 +3,7 @@
 #
 
 PROGRAM=r4dcb08
-VERSION=0.1
+VERSION=1.5
 
 # Files - odstranění read_temp.c ze zdrojových souborů
 SRC=packet.c serial.c monada.c now.c median_filter.c main.c config.c error.c signal_handler.c help_functions.c read_functions.c write_functions.c
