@@ -7,7 +7,6 @@
 #define UINT16(lo,hi) ( (uint16_t)(lo) + 256*(uint16_t)(hi) ) /* For CRC from buf */
 #define INT16(lo,hi) ( (int16_t)((uint16_t)(lo) + 256*(uint16_t)(hi)) ) 
 
-#define VERBOSE 0
 //#define DEBUG
 
 /*
