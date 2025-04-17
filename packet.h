@@ -5,8 +5,8 @@
 #ifndef PACKET_H
 #define PACKET_H
 
-//#include <stdint.h>  /* For uint8_t, uint16_t */
-//#include "typedef.h" /* For PACKET definition */
+#include <stdint.h>  /* For uint8_t, uint16_t */
+#include "typedef.h" /* For PACKET definition */
 
 /**
  * Receive mode definitions

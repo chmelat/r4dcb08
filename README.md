@@ -14,7 +14,7 @@ This utility allows you to:
 
 ### Prerequisites
 
-- GCC compiler
+- C compiler (GCC/Clang)
 - Make utility
 - Serial port support (Linux/Unix-based systems)
 
@@ -60,6 +60,11 @@ The utility provides several operation modes based on the command-line options u
 ./r4dcb08 -a 1 -x 4
 ```
 
+7. Enable three-point median filter for temperature readings:
+```bash
+./r4dcb08 -m
+```
+
 ### Command Line Options
 
 | Option | Description | Default |
@@ -73,6 +78,7 @@ The utility provides several operation modes based on the command-line options u
 | `-w [address]` | Write new device address (1-254) | - |
 | `-x [n]` | Set baudrate on R4DCB08 device {0:1200, 1:2400, 2:4800, 3:9600, 4:19200} | - |
 | `-s [ch,Tc]` | Set temperature correction Tc for channel ch | - |
+| `-m` | Enable three-point median filter for temperature readings | Off |
 | `-h` or `-?` | Display help | - |
 
 ## Notes
@@ -99,11 +105,38 @@ The utility communicates with R4DCB08 modules using Modbus RTU protocol over ser
 | 0x00FE | Device address |
 | 0x00FF | Baudrate setting |
 
-## Exit Codes
+### Architecture
 
+The utility has a modular architecture:
+- **Configuration Management**: Uses a central `ProgramConfig` structure for all settings
+- **Consistent Error Handling**: Unified error code system via `AppStatus` enum
+- **Signal Handling**: Clean termination with Ctrl+C, handling both SIGINT and SIGTERM
+- **Module Communication**: Enhanced robustness with improved monada function
+- **Data Filtering**: Optional three-point median filter for temperature readings
+
+### Error Codes
+
+The program uses the following error code categories:
 - 0: Successful operation
-- 1: Error (with description printed to stderr)
+- -10 to -19: Command-line argument errors
+- -20 to -29: Communication errors
+- -30 to -39: Operation errors
 
 ## Version
 
-V1.4 (2025-04-14)
+V1.5 (2025-04-17)
+
+## Changelog
+
+### V1.5 (2025-04-17)
+- Implemented consistent error handling system with `AppStatus` codes
+- Modularized main function with `ProgramConfig` structure
+- Improved signal handling for clean termination
+- Consolidated reading and writing functions
+- Enhanced code organization and maintainability
+
+### V1.4 (2025-04-14/16)
+- Enhanced error handling in monada function
+- Added constants to replace magic values
+- Added median filter for temperature readings
+- Improved input validation

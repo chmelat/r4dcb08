@@ -1,7 +1,7 @@
-/*
- *  Data type definition
- *  V1.0/2025-01-29 
- */
+/* typedef.h */
+
+#ifndef TYPEDEF_H
+#define TYPEDEF_H
 
 #define DMAX 253  /* Maximal data length */
 #define UINT16(lo,hi) ( (uint16_t)(lo) + 256*(uint16_t)(hi) ) /* For CRC from buf */
@@ -20,3 +20,5 @@ typedef struct {
   uint8_t data[DMAX+2];   /* Data */
   uint16_t CRC;           /* CRC (16 bit) */
 } PACKET;
+
+#endif /* TYPEDEF_H */

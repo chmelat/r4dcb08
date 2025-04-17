@@ -5,10 +5,11 @@
 PROGRAM=r4dcb08
 VERSION=0.1
 
-# Files
-SRC=packet.c serial.c monada.c now.c median_filter.c main.c
+# Files - odstranění read_temp.c ze zdrojových souborů
+SRC=packet.c serial.c monada.c now.c median_filter.c main.c config.c error.c signal_handler.c help_functions.c read_functions.c write_functions.c
 OBJ=$(SRC:.c=.o)
-HEAD=typedef.h revision.h define_error_resp.h packet.h serial.h monada.h now.h median_filter.h
+# Odstranění read_temp.h z hlavičkových souborů
+HEAD=typedef.h revision.h define_error_resp.h packet.h serial.h monada.h now.h median_filter.h config.h error.h signal_handler.h help_functions.h read_functions.h write_functions.h
 
 
 # C compiler
@@ -37,9 +38,6 @@ LIB = # -lm -lfftw3 -l_matrix  #-lefence
 .PHONY: clean
 .PHONY: dist
 
-# List of valid suffixes through the use of the .SUFFIXES special target.
-#.SUFFIXES: .c .o
-
 # Prvni cil je implicitni, neni treba volat 'make build', staci 'make'.
 # Cil build nema zadnou akci, jen zavislost.
 
@@ -67,3 +65,4 @@ $(PROGRAM): $(OBJ) Makefile
 
 .c.o: Makefile $(HEAD)
 	$(CC) $(CFLAGS) $(OPT) $(LIBINCLUDE) $(DBG) -c $<
+#
