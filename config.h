@@ -18,6 +18,7 @@ typedef struct {
     int channel;             /* Channel number for correction */
     float correction_temp;   /* Correction temperature */
     int enable_median_filter;/* 1 to enable median filter, 0 otherwise */
+    int one_shot;            /* 1 enable one shot measure, 0 othervise */
 } ProgramConfig;
 
 /**

@@ -16,10 +16,11 @@
  * @param n Number of channels to read (1-8)
  * @param dt Time step between measurements in seconds
  * @param m_f Flag to enable (1) or disable (0) three-point median filter
+ * @param one_shot Flag to enable (1) or disable (0) one shot measure without timestamp
  * 
  * @return STATUS_OK on success, otherwise an error code from AppStatus enum
  */
-AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f);
+AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f, int one_shot);
 
 /**
  * Read and print correction temperature for all channels

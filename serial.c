@@ -133,6 +133,6 @@ int set_port(int fd, int baud)
         return SERIAL_ERROR_CONFIG;
     }
 
-    fprintf(stderr, "Serial port configured at %d baud\n", baud);
+//    fprintf(stderr, "Serial port configured at %d baud\n", baud);
     return SERIAL_SUCCESS;
 }

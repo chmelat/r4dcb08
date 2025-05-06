@@ -51,6 +51,7 @@ void init_config(ProgramConfig *config) {
     config->channel = -1;
     config->correction_temp = 0.0;
     config->enable_median_filter = 0;
+    config->one_shot = 0;
 }
 
 /* Validate device address */
@@ -68,7 +69,7 @@ AppStatus parse_arguments(int argc, char *argv[], ProgramConfig *config) {
     int c;
     progname = basename(argv[0]);
 
-    while ((c = getopt(argc, argv, "p:a:b:t:n:cw:s:x:mh?")) != -1) {
+    while ((c = getopt(argc, argv, "p:a:b:t:n:cw:s:x:mfh?")) != -1) {
         switch (c) {
             case 'p':  /* Port name */
                 config->port = optarg;
@@ -127,6 +128,9 @@ AppStatus parse_arguments(int argc, char *argv[], ProgramConfig *config) {
                 break;
             case 'm':  /* Enable filter */
                 config->enable_median_filter = 1;
+                break;
+            case 'f':  /* Enable one shot */
+                config->one_shot = 1;
                 break;
             case 'h':  /* Help */
             case '?':  /* Help */
@@ -208,7 +212,7 @@ AppStatus execute_command(ProgramConfig *config) {
 
     /* Default action - read temperature */
     status = read_temp(fd, config->address, config->num_channels, 
-                     config->time_step, config->enable_median_filter);
+                     config->time_step, config->enable_median_filter, config->one_shot);
     
     fflush(stdout);
     close(fd);

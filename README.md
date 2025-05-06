@@ -79,6 +79,7 @@ The utility provides several operation modes based on the command-line options u
 | `-x [n]` | Set baudrate on R4DCB08 device {0:1200, 1:2400, 2:4800, 3:9600, 4:19200} | - |
 | `-s [ch,Tc]` | Set temperature correction Tc for channel ch | - |
 | `-m` | Enable three-point median filter for temperature readings | Off |
+| `-f` | Enable one shot measure without timestamp | Off |
 | `-h` or `-?` | Display help | - |
 
 ## Notes

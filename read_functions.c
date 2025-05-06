@@ -69,7 +69,7 @@ AppStatus read_correction(int fd, uint8_t adr)
 /**
  * Read and print temperature from 1..n channels
  */
-AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f)
+AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f, int one_shot)
 {
     int verb = 0;
     PACKET pr;
@@ -102,11 +102,13 @@ AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f)
     input_data[2] = 0x00; 
     input_data[3] = n;
 
-    printf("# Date                ");
-    for (i=1; i<=n; i++) {
+    if (!one_shot) {
+      printf("# Date                ");
+      for (i=1; i<=n; i++) {
         printf("  Ch%d",i);
-    }  
-    printf("\n");
+      }  
+      printf("\n");
+    }
 
     /* Modified loop to allow termination with Ctrl+C */
     while (running) {
@@ -138,8 +140,11 @@ AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f)
             T[i] = T_f[i];
           }
         }
-        
-        printf("%s ", sample_time);
+
+        if (!one_shot) {
+          printf("%s ", sample_time);
+        }
+
         for (i=0; i<n; i++) {
           if (T[i] != ERRRESP) 
             printf(" %.1f", T[i]);
@@ -147,9 +152,16 @@ AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f)
             printf("  NaN");
         }
         printf("\n");
-        usleep((useconds_t)(dt*1E6));
+        
+        if (!one_shot) { 
+          usleep((useconds_t)(dt*1E6));
+        }
+        if (one_shot) {
+          break;
+        }
     }
-    
-    printf("\nMeasurement stopped\n");
+    if (!one_shot) {
+      printf("\nMeasurement stopped\n");
+    }
     return STATUS_OK;
 }

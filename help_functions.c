@@ -29,6 +29,7 @@ void help(void)
         "-x [n]\t\tSet baud rate on R4DCB08 device {0:1200, 1:2400, 2:4800, 3:9600, 4:19200}, def. 9600",
         "-s [ch,Tc]\tSet temperature correction Tc for channel ch",
         "-m\t\tEnable three point median filter",
+        "-f\t\tEnable one shot measure without timestamp",
         0
     };
   
