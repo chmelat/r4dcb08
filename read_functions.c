@@ -47,7 +47,6 @@ AppStatus read_correction(int fd, uint8_t adr)
 
     status = monada(fd, adr, '\x03', 4, input_data, p_pr, verb, "read_correction", 0, &p_data);
     if (status != STATUS_OK) {
-        fprintf(stderr, "Failed to read correction values\n");
         return ERROR_READ_CORRECTION;
     }
 
@@ -108,7 +107,6 @@ AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f, int one_shot)
     while (running) {
         status = monada(fd, adr, '\x03', 4, input_data, p_pr, verb, "read_temp", 0, &p_data);
         if (status != STATUS_OK) {
-            fprintf(stderr, "Error reading temperature: %d\n", status);
             return ERROR_READ_TEMPERATURE;
         }
 

@@ -39,7 +39,6 @@ AppStatus write_address(int fd, uint8_t adr, uint8_t n_adr)
 
     status = monada(fd, adr, '\x06', 4, input_data, p_pr, verb, "write_address", 1, NULL);
     if (status != STATUS_OK) {
-        fprintf(stderr, "Failed to write new address\n");
         return ERROR_WRITE_ADDRESS;
     }
     
@@ -97,7 +96,6 @@ AppStatus write_baudrate(int fd, uint8_t adr, uint8_t cbr)
 
     status = monada(fd, adr, '\x06', 4, input_data, p_pr, verb, "write_baudrate", 1, NULL);
     if (status != STATUS_OK) {
-        fprintf(stderr, "Failed to write baudrate\n");
         return ERROR_WRITE_BAUDRATE;
     }
     
@@ -134,7 +132,6 @@ AppStatus write_correction(int fd, uint8_t adr, uint8_t ch, float T_c)
 
     status = monada(fd, adr, '\x06', 4, input_data, p_pr, verb, "correction_temperature", 1, NULL);
     if (status != STATUS_OK) {
-        fprintf(stderr, "Failed to write temperature correction\n");
         return ERROR_WRITE_CORRECTION;
     }
     

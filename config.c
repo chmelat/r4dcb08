@@ -138,13 +138,11 @@ static AppStatus init_port(char *device, int baud, int *fd) {
 
     *fd = open_port(device);
     if (*fd < 0) {
-        fprintf(stderr, "Failed to open port %s\n", device);
         return ERROR_PORT_INIT;
     }
     
     rc = set_port(*fd, baud);
     if (rc < 0) {
-        fprintf(stderr, "Problem with set_port(), rc = %d\n", rc);
         close(*fd);
         *fd = -1;
         return ERROR_PORT_INIT;
