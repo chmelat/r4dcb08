@@ -15,10 +15,10 @@
 #include "now.h"            /* Define DBUF */
 #include "define_error_resp.h"
 #include "median_filter.h"
+#include "constants.h"
 
 /* Constants */
 #define MF_WINDOW_SIZE 3     /* Size of the sliding window */
-#define MF_MAX_CHANNELS 8    /* Maximum number of channels supported */
 
 /*
  *  Declare local functions
@@ -34,7 +34,7 @@ int median_filter(char *sample, int nch, const float val[],
 {
     /* Static state for the filter */
     static int i = 0;
-    static float val_vec[MF_WINDOW_SIZE][MF_MAX_CHANNELS];
+    static float val_vec[MF_WINDOW_SIZE][MAX_CHANNELS];
     static char s_vec[MF_WINDOW_SIZE][DBUF];
     static int start = 1;
     
@@ -46,7 +46,7 @@ int median_filter(char *sample, int nch, const float val[],
         return MF_ERR_PARAM;
     }
     
-    if (nch <= 0 || nch > MF_MAX_CHANNELS) {
+    if (nch <= 0 || nch > MAX_CHANNELS) {
         fprintf(stderr, "median_filter: Invalid channel count: %d\n", nch);
         return MF_ERR_RANGE;
     }

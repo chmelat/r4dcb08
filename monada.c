@@ -16,17 +16,13 @@
 #include "packet.h"   /* Packet functions declarations */
 #include "monada.h"   /* Function declarations */
 
-/*
- *  Global variables
- */
-static MonadaStatus last_status = MONADA_OK;  /* Status of the last operation */
 
 /*
  *  Send an instruction to the device and receive the response
  */
-uint8_t *monada(int fd, uint8_t adr, uint8_t inst, int in_len, 
-               uint8_t *arg, PACKET *p_r, int verb, 
-               const char *msg, int mode)
+AppStatus monada(int fd, uint8_t adr, uint8_t inst, int in_len, 
+                uint8_t *arg, PACKET *p_r, int verb, 
+                const char *msg, int mode, uint8_t **data_out)
 {
     static uint8_t data[DMAX];  /* Array for data (not thread-safe) */
     uint8_t *p_data = data;     /* Pointer to data array */
@@ -37,25 +33,19 @@ uint8_t *monada(int fd, uint8_t adr, uint8_t inst, int in_len,
     int i, result;
     const char *function_name = "monada";
 
-    /* Reset status */
-    last_status = MONADA_OK;
-
     /* Validate parameters */
     if (p_r == NULL || msg == NULL || fd < 0 || 
         mode < 0 || mode >= RECEIVE_MODE_MAX) {
         fprintf(stderr, "%s: Invalid parameter(s)\n", function_name);
-        last_status = MONADA_ERROR_INVALID_PARAM;
-        return NULL;
+        return ERROR_INVALID_ADDRESS; /* Use existing AppStatus error */
     }
 
-    /* Check input data length */
+    /* Validate input data length */
     if (in_len > DMAX || in_len < 0) {
-        fprintf(stderr, "%s: In %s - data too long: %d > %d!\n", 
-                function_name, msg, in_len, DMAX);
-        last_status = MONADA_ERROR_DATA_TOO_LONG;
-        return NULL;
+        fprintf(stderr, "%s: Input data too long (%d > %d)\n", function_name, in_len, DMAX);
+        return ERROR_PACKET_OVERFLOW;
     }
-
+    
     /* Copy input data to local buffer */
     if (arg != NULL && in_len > 0) {
         for (i = 0; i < in_len; i++) {
@@ -72,20 +62,18 @@ uint8_t *monada(int fd, uint8_t adr, uint8_t inst, int in_len,
     #endif
 
     /* Send packet */
-    result = send_packet(fd, p_tx);
-    if (result < 0) {
+    result = send_packet(fd, p_tx, NULL);
+    if (result != STATUS_OK) {
         fprintf(stderr, "%s: In %s - send error!\n", function_name, msg);
-        last_status = MONADA_ERROR_SEND_FAILED;
-        return NULL;
+        return result; /* Return the actual AppStatus error */
     }
 
     /* Receive response */
     result = received_packet(fd, p_rx, mode);
-    if (result < 0) {
+    if (result != STATUS_OK) {
         fprintf(stderr, "%s: In %s - receive error (mode %d)!\n", 
                 function_name, msg, mode);
-        last_status = MONADA_ERROR_RECEIVE_FAILED;
-        return NULL;
+        return result; /* Return the actual AppStatus error */
     }
 
     #ifdef DEBUG
@@ -101,14 +89,10 @@ uint8_t *monada(int fd, uint8_t adr, uint8_t inst, int in_len,
     /* Copy received packet to output parameter */
     *p_r = rx_packet;
     
-    /* Return pointer to received data */
-    return p_rx->data;
-}
-
-/*
- *  Get the status of the last monada operation
- */
-MonadaStatus monada_status(void)
-{
-    return last_status;
+    /* Store data pointer if requested */
+    if (data_out != NULL) {
+        *data_out = p_rx->data;
+    }
+    
+    return STATUS_OK;
 }

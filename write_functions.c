@@ -9,21 +9,7 @@
 #include "write_functions.h"
 #include "monada.h"
 #include "typedef.h"
-
-/* Constants */
-#define MAX_CHANNELS 8
-#define MIN_DEVICE_ADDRESS 1
-#define MAX_DEVICE_ADDRESS 254
-
-/* Baudrate codes enumeration */
-typedef enum {
-    BAUD_1200 = 0,
-    BAUD_2400 = 1,
-    BAUD_4800 = 2,
-    BAUD_9600 = 3,
-    BAUD_19200 = 4,
-    BAUD_INVALID = 9
-} BaudrateCode;
+#include "constants.h"
 
 /* 
  * Write a new device address
@@ -33,9 +19,8 @@ AppStatus write_address(int fd, uint8_t adr, uint8_t n_adr)
     int verb = 1; 
     PACKET pr;
     PACKET *p_pr = &pr;
-    uint8_t *p_data;
     uint8_t input_data[DMAX];
-    MonadaStatus monada_rc;
+    AppStatus status;
 
     /* Validate input */
     if (n_adr < MIN_DEVICE_ADDRESS || n_adr > MAX_DEVICE_ADDRESS) {
@@ -52,11 +37,8 @@ AppStatus write_address(int fd, uint8_t adr, uint8_t n_adr)
 
     printf("Old address %d, new address %d\n", adr, n_adr);
 
-    p_data = monada(fd, adr, '\x06', 4, input_data, p_pr, verb, "write_address", 1);
-    
-    /* Check for errors */
-    monada_rc = monada_status();
-    if (monada_rc != MONADA_OK || p_data == NULL) {
+    status = monada(fd, adr, '\x06', 4, input_data, p_pr, verb, "write_address", 1, NULL);
+    if (status != STATUS_OK) {
         fprintf(stderr, "Failed to write new address\n");
         return ERROR_WRITE_ADDRESS;
     }
@@ -67,18 +49,24 @@ AppStatus write_address(int fd, uint8_t adr, uint8_t n_adr)
 /*
  * Get baudrate value from code
  */
-int get_baudrate_value(uint8_t code)
+AppStatus get_baudrate_value(uint8_t code, int *baudrate)
 {
+    if (baudrate == NULL) {
+        return ERROR_INVALID_BAUDRATE;
+    }
+    
     switch (code) {
-        case BAUD_1200:  return 1200;
-        case BAUD_2400:  return 2400;
-        case BAUD_4800:  return 4800;
-        case BAUD_9600:  return 9600;
-        case BAUD_19200: return 19200;
+        case BAUD_1200:  *baudrate = 1200; break;
+        case BAUD_2400:  *baudrate = 2400; break;
+        case BAUD_4800:  *baudrate = 4800; break;
+        case BAUD_9600:  *baudrate = 9600; break;
+        case BAUD_19200: *baudrate = 19200; break;
         default:
             fprintf(stderr, "Invalid baudrate code: %d\n", code);
-            return -1;
+            return ERROR_INVALID_BAUDRATE;
     }
+    
+    return STATUS_OK;
 }
 
 /*
@@ -89,15 +77,14 @@ AppStatus write_baudrate(int fd, uint8_t adr, uint8_t cbr)
     int verb = 1; 
     PACKET pr;
     PACKET *p_pr = &pr;
-    uint8_t *p_data;
     uint8_t input_data[DMAX];
     int baud;
-    MonadaStatus monada_rc;
+    AppStatus status;
 
     /* Get baudrate value from code */
-    baud = get_baudrate_value(cbr);
-    if (baud < 0) {
-        return ERROR_INVALID_BAUDRATE;
+    status = get_baudrate_value(cbr, &baud);
+    if (status != STATUS_OK) {
+        return status;
     }
 
     /* Register address (2 byte) + Setting content (2 byte) */       
@@ -108,11 +95,8 @@ AppStatus write_baudrate(int fd, uint8_t adr, uint8_t cbr)
 
     printf("Set baudrate to %d, will be updated when module is powered on again!\n", baud);
 
-    p_data = monada(fd, adr, '\x06', 4, input_data, p_pr, verb, "write_baudrate", 1);
-    
-    /* Check for errors */
-    monada_rc = monada_status();
-    if (monada_rc != MONADA_OK || p_data == NULL) {
+    status = monada(fd, adr, '\x06', 4, input_data, p_pr, verb, "write_baudrate", 1, NULL);
+    if (status != STATUS_OK) {
         fprintf(stderr, "Failed to write baudrate\n");
         return ERROR_WRITE_BAUDRATE;
     }
@@ -128,11 +112,10 @@ AppStatus write_correction(int fd, uint8_t adr, uint8_t ch, float T_c)
     int verb = 1;    
     PACKET pr;
     PACKET *p_pr = &pr;
-    uint8_t *p_data;
     uint8_t input_data[DMAX];
     int16_t T;
     char *p_char;
-    MonadaStatus monada_rc;
+    AppStatus status;
 
     /* Validate channel number */
     if (ch < 1 || ch > MAX_CHANNELS) {
@@ -149,11 +132,8 @@ AppStatus write_correction(int fd, uint8_t adr, uint8_t ch, float T_c)
     input_data[2] = *(p_char+1); 
     input_data[3] = *p_char;
 
-    p_data = monada(fd, adr, '\x06', 4, input_data, p_pr, verb, "correction_temperature", 1);
-    
-    /* Check for errors */
-    monada_rc = monada_status();
-    if (monada_rc != MONADA_OK || p_data == NULL) {
+    status = monada(fd, adr, '\x06', 4, input_data, p_pr, verb, "correction_temperature", 1, NULL);
+    if (status != STATUS_OK) {
         fprintf(stderr, "Failed to write temperature correction\n");
         return ERROR_WRITE_CORRECTION;
     }

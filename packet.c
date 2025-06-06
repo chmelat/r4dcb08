@@ -37,7 +37,7 @@ static int read_with_timeout(int fd, uint8_t *buffer, int size, int timeout_ms);
 /*
  *  Receive a packet from the device
  */
-int received_packet(int fd, PACKET *p_RP, int mode)
+AppStatus received_packet(int fd, PACKET *p_RP, int mode)
 {
     const char *msg = "received_packet";
     uint8_t buf[MAX_PACKET_SIZE];
@@ -49,19 +49,19 @@ int received_packet(int fd, PACKET *p_RP, int mode)
     /* Validate input parameters */
     if (p_RP == NULL) {
         fprintf(stderr, "%s: NULL packet pointer\n", msg);
-        return -1;
+        return ERROR_PACKET_NULL;
     }
 
     if (mode < 0 || mode >= RECEIVE_MODE_MAX) {
         fprintf(stderr, "%s: %s (%d)\n", msg, ERR_INVALID_MODE, mode);
-        return -2;
+        return ERROR_PACKET_MODE;
     }
 
     /* Read first byte (address) */
     bytes_read = read_with_timeout(fd, buf, 1, READ_TIMEOUT_MS);
     if (bytes_read != 1) {
         fprintf(stderr, "%s: Timeout waiting for address byte\n", msg);
-        return -1;
+        return ERROR_PACKET_TIMEOUT;
     }
 
     /* Determine expected packet length based on mode */
@@ -70,7 +70,7 @@ int received_packet(int fd, PACKET *p_RP, int mode)
         bytes_read = read_with_timeout(fd, buf + 1, 2, READ_TIMEOUT_MS);
         if (bytes_read != 2) {
             fprintf(stderr, "%s: Timeout waiting for function and length bytes\n", msg);
-            return -1;
+            return ERROR_PACKET_TIMEOUT;
         }
 
         /* Calculate total expected length */
@@ -80,7 +80,7 @@ int received_packet(int fd, PACKET *p_RP, int mode)
         if (total_length < MIN_PACKET_SIZE || total_length > MAX_PACKET_SIZE) {
             fprintf(stderr, "%s: %s, invalid total length: %d\n", 
                     msg, ERR_INVALID_LENGTH, total_length);
-            return -1;
+            return ERROR_PACKET_OVERFLOW;
         }
 
         /* Read remaining data and CRC */
@@ -88,7 +88,7 @@ int received_packet(int fd, PACKET *p_RP, int mode)
         if (bytes_read != total_length - 3) {
             fprintf(stderr, "%s: %s, expected %d bytes, got %d\n", 
                     msg, ERR_INVALID_LENGTH, total_length - 3, bytes_read);
-            return -1;
+            return ERROR_PACKET_TIMEOUT;
         }
     } 
     else if (mode == RECEIVE_MODE_ACKNOWLEDGE) {
@@ -97,7 +97,7 @@ int received_packet(int fd, PACKET *p_RP, int mode)
         if (bytes_read != 7) {
             fprintf(stderr, "%s: %s, expected 7 bytes, got %d\n", 
                     msg, ERR_INVALID_LENGTH, bytes_read);
-            return -1;
+            return ERROR_PACKET_TIMEOUT;
         }
         total_length = 8;  /* Fixed length for acknowledge packet */
     }
@@ -136,19 +136,19 @@ int received_packet(int fd, PACKET *p_RP, int mode)
         fprintf(stderr, "%s: %s, calculated: 0x%04X, received: 0x%04X\n", 
                 msg, ERR_CRC_MISMATCH, crc_calculated, p_RP->CRC);
         print_packet(p_RP);
-        return -1;
+        return ERROR_PACKET_CRC;
     }
 
     /* Small delay to ensure stable operation */
     usleep((useconds_t)(8000));
 
-    return 0;
+    return STATUS_OK;
 }
 
 /*
  *  Send a packet to the device
  */
-int send_packet(int fd, PACKET *p_SP)
+AppStatus send_packet(int fd, PACKET *p_SP, int *bytes_sent)
 {
     const char *msg = "send_packet";
     uint8_t buf[MAX_PACKET_SIZE];
@@ -157,12 +157,12 @@ int send_packet(int fd, PACKET *p_SP)
     /* Validate input parameters */
     if (p_SP == NULL) {
         fprintf(stderr, "%s: NULL packet pointer\n", msg);
-        return -1;
+        return ERROR_PACKET_NULL;
     }
 
     if (p_SP->len > DMAX) {
         fprintf(stderr, "%s: %s (%u > %d)\n", msg, ERR_DATA_OVERFLOW, p_SP->len, DMAX);
-        return -1;
+        return ERROR_PACKET_OVERFLOW;
     }
 
     /* Assemble packet */
@@ -182,10 +182,15 @@ int send_packet(int fd, PACKET *p_SP)
     if (write(fd, buf, p_SP->len + 4) < 0) {
         fprintf(stderr, "%s: %s (errno: %d, %s)\n", 
                 msg, ERR_WRITE_FAILED, errno, strerror(errno));
-        return -1;
+        return ERROR_PACKET_WRITE;
     }
     
-    return p_SP->len;  /* Return length of correctly sent data */
+    /* Store bytes sent if requested */
+    if (bytes_sent != NULL) {
+        *bytes_sent = p_SP->len;
+    }
+    
+    return STATUS_OK;
 }
 
 /*

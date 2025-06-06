@@ -3,13 +3,13 @@
 #
 
 PROGRAM=r4dcb08
-VERSION=1.5
+VERSION=$(shell grep '^#define VERSION' revision.h | sed 's/.*"\(.*\)".*/\1/')
 
 # Files - odstranění read_temp.c ze zdrojových souborů
 SRC=packet.c serial.c monada.c now.c median_filter.c main.c config.c error.c signal_handler.c help_functions.c read_functions.c write_functions.c
 OBJ=$(SRC:.c=.o)
 # Odstranění read_temp.h z hlavičkových souborů
-HEAD=typedef.h revision.h define_error_resp.h packet.h serial.h monada.h now.h median_filter.h config.h error.h signal_handler.h help_functions.h read_functions.h write_functions.h
+HEAD=typedef.h revision.h define_error_resp.h packet.h serial.h monada.h now.h median_filter.h config.h error.h signal_handler.h help_functions.h read_functions.h write_functions.h constants.h
 
 
 # C compiler
@@ -57,7 +57,7 @@ clean:
 
 # Source package
 dist:
-	tar czf $(PROGRAM)-$(VERSION).tgz $(SRC) $(HEAD) Makefile
+	tar czf $(PROGRAM)-$(VERSION).tgz $(SRC) $(HEAD) Makefile README.md
 
 # Linked
 $(PROGRAM): $(OBJ) Makefile

@@ -125,9 +125,25 @@ The program uses the following error code categories:
 
 ## Version
 
-V1.5 (2025-04-17)
+V1.7 (2025-06-06)
 
 ## Changelog
+
+### V1.7 (2025-06-06)
+- **Major refactoring and code improvements:**
+- Unified error handling system - integrated MonadaStatus into central AppStatus
+- Centralized constants in constants.h (eliminated duplicate definitions)
+- Enhanced packet functions with proper AppStatus return codes
+- Fixed resource leak in port initialization
+- Improved progname initialization
+- Added comprehensive error messages for all packet operations
+- Updated Makefile to auto-extract VERSION from revision.h
+- Enhanced code reliability and maintainability
+
+### V1.6 (2025-06-06)
+- Fixed baud rate table bug (1200 baud correction)
+- Improved error handling consistency
+- Code cleanup and optimization
 
 ### V1.5 (2025-04-17)
 - Implemented consistent error handling system with `AppStatus` codes

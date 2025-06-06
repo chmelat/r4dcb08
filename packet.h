@@ -7,6 +7,7 @@
 
 #include <stdint.h>  /* For uint8_t, uint16_t */
 #include "typedef.h" /* For PACKET definition */
+#include "error.h"   /* For AppStatus */
 
 /**
  * Receive mode definitions
@@ -23,20 +24,19 @@ typedef enum {
  * @param fd    File descriptor of the serial port
  * @param p_RP  Pointer to PACKET structure to store received data
  * @param mode  Receiving mode (RECEIVE_MODE_TEMPERATURE or RECEIVE_MODE_ACKNOWLEDGE)
- * @return      0 on success, negative value on error
- *              -1: General error
- *              -2: Invalid mode
+ * @return      STATUS_OK on success, AppStatus error code on failure
  */
-extern int received_packet(int fd, PACKET *p_RP, int mode);
+extern AppStatus received_packet(int fd, PACKET *p_RP, int mode);
 
 /**
  * Send a packet to the device
  *
- * @param fd    File descriptor of the serial port
- * @param p_SP  Pointer to PACKET structure with data to send
- * @return      Number of data bytes sent on success, negative value on error
+ * @param fd        File descriptor of the serial port
+ * @param p_SP      Pointer to PACKET structure with data to send
+ * @param bytes_sent Pointer to store number of bytes sent (optional, can be NULL)
+ * @return          STATUS_OK on success, AppStatus error code on failure
  */
-extern int send_packet(int fd, PACKET *p_SP);
+extern AppStatus send_packet(int fd, PACKET *p_SP, int *bytes_sent);
 
 /**
  * Form a packet with given parameters

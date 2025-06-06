@@ -16,11 +16,8 @@
 #include "typedef.h"
 #include "define_error_resp.h"
 #include "signal_handler.h"
+#include "constants.h"
 
-/* Constants */
-#define MAX_CHANNELS 8
-#define MIN_TEMPERATURE -55.0
-#define MAX_TEMPERATURE 125.0
 
 /**
  * Read and print correction temperature for all channels
@@ -34,7 +31,7 @@ AppStatus read_correction(int fd, uint8_t adr)
     uint8_t input_data[DMAX];
     int i;
     float T;
-    MonadaStatus monada_rc;
+    AppStatus status;
 
     /* Register address (2 byte) + Read number (2 byte) */       
     input_data[0] = 0x00; 
@@ -48,11 +45,8 @@ AppStatus read_correction(int fd, uint8_t adr)
     }  
     printf("\n");
 
-    p_data = monada(fd, adr, '\x03', 4, input_data, p_pr, verb, "read_correction", 0);
-    
-    /* Check for errors */
-    monada_rc = monada_status();
-    if (monada_rc != MONADA_OK || p_data == NULL) {
+    status = monada(fd, adr, '\x03', 4, input_data, p_pr, verb, "read_correction", 0, &p_data);
+    if (status != STATUS_OK) {
         fprintf(stderr, "Failed to read correction values\n");
         return ERROR_READ_CORRECTION;
     }
@@ -82,7 +76,7 @@ AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f, int one_shot)
     float T_f[MAX_CHANNELS];
     char *sample_time = NULL;
     char sample_t_f[DBUF];  /* Sample time after filtering */
-    MonadaStatus monada_rc;
+    AppStatus status;
 
     /* Input validation */
     if (n < 1 || n > MAX_CHANNELS) {
@@ -112,12 +106,9 @@ AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f, int one_shot)
 
     /* Modified loop to allow termination with Ctrl+C */
     while (running) {
-        p_data = monada(fd, adr, '\x03', 4, input_data, p_pr, verb, "read_temp", 0);
-        
-        /* Check for error from monada */
-        monada_rc = monada_status();
-        if (monada_rc != MONADA_OK || p_data == NULL) {
-            fprintf(stderr, "Error reading temperature: %d\n", monada_rc);
+        status = monada(fd, adr, '\x03', 4, input_data, p_pr, verb, "read_temp", 0, &p_data);
+        if (status != STATUS_OK) {
+            fprintf(stderr, "Error reading temperature: %d\n", status);
             return ERROR_READ_TEMPERATURE;
         }
 

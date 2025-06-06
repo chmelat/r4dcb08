@@ -33,6 +33,9 @@ int main(int argc, char *argv[])
     ProgramConfig config;
     AppStatus status;
     
+    /* Initialize global variables */
+    progname = basename(argv[0]);
+    
     /* Initialize configuration */
     init_config(&config);
     

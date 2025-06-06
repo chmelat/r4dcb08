@@ -25,7 +25,7 @@ static speed_t get_baud(int baud)
         int rate;
         speed_t speed;
     } baud_table[] = {
-        { 1200, B2400 },
+        { 1200, B1200 },
         { 2400, B2400 },
         { 4800, B4800 },
         { 9600, B9600 },

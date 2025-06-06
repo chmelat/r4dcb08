@@ -25,6 +25,18 @@ const char* get_error_message(AppStatus status) {
             return "Failed to send packet";
         case ERROR_RECEIVE_PACKET:
             return "Failed to receive packet";
+        case ERROR_PACKET_NULL:
+            return "NULL packet pointer";
+        case ERROR_PACKET_TIMEOUT:
+            return "Packet read timeout";
+        case ERROR_PACKET_CRC:
+            return "CRC verification failed";
+        case ERROR_PACKET_MODE:
+            return "Invalid receive mode";
+        case ERROR_PACKET_OVERFLOW:
+            return "Data length exceeds maximum";
+        case ERROR_PACKET_WRITE:
+            return "Failed to write packet to port";
         case ERROR_WRITE_ADDRESS:
             return "Failed to write address";
         case ERROR_WRITE_BAUDRATE:

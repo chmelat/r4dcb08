@@ -15,33 +15,16 @@
 #include "read_functions.h"
 #include "write_functions.h"
 #include "help_functions.h"
+#include "constants.h"
 
 /* External global variables */
 extern char *progname;
 
-/* Constants from main.c */
-#define PORT "/dev/ttyUSB0"      /* Linux */
-#define ADR '\x01'               /* Default address */
-#define MAX_CHANNELS 8
-#define MIN_DEVICE_ADDRESS 1
-#define MAX_DEVICE_ADDRESS 254
-#define MIN_TEMPERATURE -55.0
-#define MAX_TEMPERATURE 125.0
-
-/* Baudrate codes enumeration (from main.c) */
-typedef enum {
-    BAUD_1200 = 0,
-    BAUD_2400 = 1,
-    BAUD_4800 = 2,
-    BAUD_9600 = 3,
-    BAUD_19200 = 4,
-    BAUD_INVALID = 9  /* Original default value */
-} BaudrateCode;
 
 /* Initialize configuration */
 void init_config(ProgramConfig *config) {
     config->port = NULL;
-    config->address = ADR;
+    config->address = DEFAULT_ADDRESS;
     config->baudrate = 9600;
     config->time_step = 1;
     config->num_channels = 1;
@@ -67,7 +50,6 @@ static AppStatus validate_device_address(uint8_t address) {
 /* Process command line arguments */
 AppStatus parse_arguments(int argc, char *argv[], ProgramConfig *config) {
     int c;
-    progname = basename(argv[0]);
 
     while ((c = getopt(argc, argv, "p:a:b:t:n:cw:s:x:mfh?")) != -1) {
         switch (c) {
@@ -163,6 +145,8 @@ static AppStatus init_port(char *device, int baud, int *fd) {
     rc = set_port(*fd, baud);
     if (rc < 0) {
         fprintf(stderr, "Problem with set_port(), rc = %d\n", rc);
+        close(*fd);
+        *fd = -1;
         return ERROR_PORT_INIT;
     }
     
@@ -173,7 +157,7 @@ static AppStatus init_port(char *device, int baud, int *fd) {
 AppStatus execute_command(ProgramConfig *config) {
     int fd;
     AppStatus status;
-    char *device = config->port ? config->port : PORT;
+    char *device = config->port ? config->port : DEFAULT_PORT;
     
     /* Initialize port */
     status = init_port(device, config->baudrate, &fd);

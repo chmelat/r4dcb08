@@ -21,6 +21,12 @@ typedef enum {
     ERROR_PORT_INIT = -20,       /* Port initialization failure */
     ERROR_SEND_PACKET = -21,     /* Failed to send packet */
     ERROR_RECEIVE_PACKET = -22,  /* Failed to receive packet */
+    ERROR_PACKET_NULL = -23,     /* NULL packet pointer */
+    ERROR_PACKET_TIMEOUT = -24,  /* Packet read timeout */
+    ERROR_PACKET_CRC = -25,      /* CRC verification failed */
+    ERROR_PACKET_MODE = -26,     /* Invalid receive mode */
+    ERROR_PACKET_OVERFLOW = -27, /* Data length exceeds maximum */
+    ERROR_PACKET_WRITE = -28,    /* Failed to write packet to port */
     
     /* Operation errors */
     ERROR_WRITE_ADDRESS = -30,   /* Failed to write address */

@@ -8,17 +8,8 @@
 #include <stdint.h>  /* For uint8_t */
 //#include "typedef.h" /* For PACKET definition */
 #include "packet.h"  /* For ReceiveMode enum */
+#include "error.h"   /* For AppStatus */
 
-/**
- * Status codes for monada function
- */
-typedef enum {
-    MONADA_OK = 0,               /* Operation successful */
-    MONADA_ERROR_INVALID_PARAM = -1,  /* Invalid parameter */
-    MONADA_ERROR_DATA_TOO_LONG = -2,  /* Input data too long */
-    MONADA_ERROR_SEND_FAILED = -3,    /* Failed to send packet */
-    MONADA_ERROR_RECEIVE_FAILED = -4  /* Failed to receive packet */
-} MonadaStatus;
 
 /**
  * Send an instruction to the device and receive the response
@@ -35,19 +26,13 @@ typedef enum {
  * @param verb    Verbosity flag: 1 = print "OK" message, 0 = silent
  * @param msg     Operation name for debugging messages
  * @param mode    Receive mode (RECEIVE_MODE_TEMPERATURE or RECEIVE_MODE_ACKNOWLEDGE)
+ * @param data_out Pointer to store received data pointer (optional, can be NULL)
  *
- * @return        Pointer to received data on success, NULL on error. 
- *                Check return value with monada_status() for error details.
+ * @return        STATUS_OK on success, AppStatus error code on failure
  */
-extern uint8_t *monada(int fd, uint8_t adr, uint8_t inst, int in_len, 
-                      uint8_t *arg, PACKET *p_r, int verb, 
-                      const char *msg, int mode);
+extern AppStatus monada(int fd, uint8_t adr, uint8_t inst, int in_len, 
+                       uint8_t *arg, PACKET *p_r, int verb, 
+                       const char *msg, int mode, uint8_t **data_out);
 
-/**
- * Get the status of the last monada operation
- *
- * @return        Status code from the MonadaStatus enum
- */
-extern MonadaStatus monada_status(void);
 
 #endif /* MONADA_H */
