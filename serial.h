@@ -3,6 +3,7 @@
  *  V1.0/8.11.2012/TCh
  *  V1.1/250109 Add baud rate selection
  *  V1.2/250313 Updated API with error codes
+ *  V1.3/250829 Add iserial lock (flock())
  */
 
 #ifndef SERIAL_H
@@ -15,9 +16,11 @@
 #define SERIAL_ERROR_ATTR   -3
 #define SERIAL_ERROR_BAUD   -4
 #define SERIAL_ERROR_CONFIG -5
+#define SERIAL_ERROR_LOCK   -6
 
 /**
- * Opens a serial port with the specified device name.
+ * Opens a serial port with the specified device name and applies exclusive lock.
+ * If another process has the port locked, this function will block until the lock is released.
  *
  * @param device Path to the serial device
  * @return File descriptor on success, negative error code on failure

@@ -4,6 +4,7 @@
  *  V1.1/250109  Add select baud rate of serial port
  *  V1.2/250308 Optimized version (AI)
  *  V1.3/250313 Updated to return error codes instead of exiting
+ *  V1.4/250829 Add iserial lock (flock())
  */
 #include <stdio.h>   /* Standard input/output definitions */
 #include <stdlib.h>  /* Standard lib */
@@ -12,6 +13,7 @@
 #include <fcntl.h>   /* File control definitions */
 #include <errno.h>   /* Error number definitions */
 #include <termios.h> /* POSIX terminal control definitions */
+#include <sys/file.h> /* File locking definitions */
 
 #include "serial.h"
 
@@ -77,6 +79,14 @@ int open_port(const char *device)
         fprintf(stderr, "open_port: fcntl error - %s\n", strerror(errno));
         close(fd);
         return SERIAL_ERROR_FCNTL;
+    }
+
+    /* Apply exclusive lock to prevent concurrent access */
+    if (flock(fd, LOCK_EX) == -1) {
+        fprintf(stderr, "open_port: Unable to lock %s - %s\n", 
+                device, strerror(errno));
+        close(fd);
+        return SERIAL_ERROR_LOCK;
     }
 
     return fd;
