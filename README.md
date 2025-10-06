@@ -125,9 +125,15 @@ The program uses the following error code categories:
 
 ## Version
 
-V1.7 (2025-06-06)
+V1.8 (2025-08-29)
 
 ## Changelog
+
+### V1.8 (2025-08-29)
+- **Serial port locking improvements:**
+- Added exclusive file locking (flock) to prevent concurrent access to serial port
+- Enhanced error handling for port locking failures
+- Improved reliability in multi-process environments
 
 ### V1.7 (2025-06-06)
 - **Major refactoring and code improvements:**
