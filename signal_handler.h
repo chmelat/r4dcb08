@@ -21,8 +21,14 @@ void handle_signal(int sig);
 
 /*
  * Initialize signal handlers
- * Sets up handlers for SIGINT and SIGTERM
+ * Sets up handlers for SIGINT and SIGTERM using sigaction()
  */
 void init_signal_handlers(void);
+
+/*
+ * Get the signal number that caused termination
+ * Returns 0 if no signal was received
+ */
+int get_received_signal(void);
 
 #endif /* SIGNAL_HANDLER_H */

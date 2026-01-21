@@ -112,7 +112,6 @@ AppStatus write_correction(int fd, uint8_t adr, uint8_t ch, float T_c)
     PACKET *p_pr = &pr;
     uint8_t input_data[DMAX];
     int16_t T;
-    char *p_char;
     AppStatus status;
 
     /* Validate channel number */
@@ -122,13 +121,12 @@ AppStatus write_correction(int fd, uint8_t adr, uint8_t ch, float T_c)
     }
 
     T = (int16_t)(10*T_c);
-    p_char = (char *)(&T);
 
-    /* Register address (2 byte) + Setting content (2 byte) */       
-    input_data[0] = 0x00; 
-    input_data[1] = ch + 7; /* 0x08..0x0F */ 
-    input_data[2] = *(p_char+1); 
-    input_data[3] = *p_char;
+    /* Register address (2 byte) + Setting content (2 byte) */
+    input_data[0] = 0x00;
+    input_data[1] = ch + 7; /* 0x08..0x0F */
+    input_data[2] = (T >> 8) & 0xFF;  /* high byte */
+    input_data[3] = T & 0xFF;         /* low byte */
 
     status = monada(fd, adr, '\x06', 4, input_data, p_pr, verb, "correction_temperature", 1, NULL);
     if (status != STATUS_OK) {

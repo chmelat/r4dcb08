@@ -26,7 +26,7 @@ void help(void)
         "-n [num]\tNumber of channels to read (1-8), def. 1",
         "-c\t\tRead correction temperature [C]",
         "-w [address]\tWrite new device address (1..254)",
-        "-x [n]\t\tSet baud rate on R4DCB08 device {0:1200, 1:2400, 2:4800, 3:9600, 4:19200}, def. 9600",
+        "-x [n]\t\tSet baud rate on R4DCB08 device {0:1200, 1:2400, 2:4800, 3:9600, 4:19200}",
         "-s [ch,Tc]\tSet temperature correction Tc for channel ch",
         "-m\t\tEnable three point median filter",
         "-f\t\tEnable one shot measure without timestamp",

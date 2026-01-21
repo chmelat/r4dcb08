@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 
 #include "read_functions.h"
 #include "error.h"
@@ -111,6 +112,10 @@ AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f, int one_shot)
         }
 
         sample_time = now();
+        if (sample_time == NULL) {
+            fprintf(stderr, "read_temp: Failed to get current time\n");
+            return ERROR_READ_TEMPERATURE;
+        }
 
         for (i=0; i<n; i++) {
             T[i] = (float)INT16(p_data[2*i+1], p_data[2*i])/10; /* Temperature [C] */
@@ -142,15 +147,23 @@ AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f, int one_shot)
         }
         printf("\n");
         
-        if (!one_shot) { 
-          usleep((useconds_t)(dt*1E6));
+        if (!one_shot && dt > 0) {
+          struct timespec ts = { .tv_sec = dt, .tv_nsec = 0 };
+          nanosleep(&ts, NULL);
         }
         if (one_shot) {
           break;
         }
     }
     if (!one_shot) {
-      printf("\nMeasurement stopped\n");
+      int sig = get_received_signal();
+      if (sig == SIGINT) {
+          printf("\nReceived SIGINT (Ctrl+C), measurement stopped\n");
+      } else if (sig == SIGTERM) {
+          printf("\nReceived SIGTERM, measurement stopped\n");
+      } else {
+          printf("\nMeasurement stopped\n");
+      }
     }
     return STATUS_OK;
 }
