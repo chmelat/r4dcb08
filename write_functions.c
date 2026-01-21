@@ -107,7 +107,7 @@ AppStatus write_baudrate(int fd, uint8_t adr, uint8_t cbr)
  */
 AppStatus write_correction(int fd, uint8_t adr, uint8_t ch, float T_c)
 {
-    int verb = 1;    
+    int verb = 1;
     PACKET pr;
     PACKET *p_pr = &pr;
     uint8_t input_data[DMAX];
@@ -132,7 +132,49 @@ AppStatus write_correction(int fd, uint8_t adr, uint8_t ch, float T_c)
     if (status != STATUS_OK) {
         return ERROR_WRITE_CORRECTION;
     }
-    
+
     printf("Write temperature correction %.1f to channel %d\n", T_c, ch);
+    return STATUS_OK;
+}
+
+/*
+ * Perform factory reset on the device
+ * Writes value 5 to register 0x00FF
+ */
+AppStatus factory_reset(int fd, uint8_t adr)
+{
+    int verb = 1;
+    PACKET pr;
+    PACKET *p_pr = &pr;
+    uint8_t input_data[DMAX];
+    AppStatus status;
+
+    /* Register address 0x00FF + Factory reset code 0x0005 */
+    input_data[0] = 0x00;
+    input_data[1] = 0xFF;
+    input_data[2] = 0x00;
+    input_data[3] = 0x05;  /* Factory reset command */
+
+    printf("Performing factory reset on device at address %d...\n", adr);
+    printf("WARNING: Device will reset to:\n");
+    printf("  - Address: 1\n");
+    printf("  - Baudrate: 9600\n");
+    printf("  - All temperature corrections: 0\n");
+
+    status = monada(fd, adr, '\x06', 4, input_data, p_pr, verb, "factory_reset", 1, NULL);
+
+    /* Note: Device may not respond after reset, so timeout is acceptable */
+    if (status == ERROR_PACKET_TIMEOUT) {
+        printf("Factory reset sent (device may not respond - this is normal)\n");
+        printf("IMPORTANT: Power cycle the device to load new settings from EEPROM!\n");
+        return STATUS_OK;
+    }
+
+    if (status != STATUS_OK) {
+        return ERROR_FACTORY_RESET;
+    }
+
+    printf("Factory reset command sent successfully.\n");
+    printf("IMPORTANT: Power cycle the device to load new settings from EEPROM!\n");
     return STATUS_OK;
 }

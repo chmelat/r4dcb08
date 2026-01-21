@@ -44,12 +44,29 @@ AppStatus write_correction(int fd, uint8_t adr, uint8_t ch, float T_c);
 
 /**
  * Get baudrate value from code
- * 
+ *
  * @param code Baudrate code (0:1200, 1:2400, 2:4800, 3:9600, 4:19200)
  * @param baudrate Pointer to store the baudrate value
- * 
+ *
  * @return STATUS_OK on success, ERROR_INVALID_BAUDRATE on error
  */
 AppStatus get_baudrate_value(uint8_t code, int *baudrate);
+
+/**
+ * Perform factory reset on the device
+ *
+ * Resets the device to factory default settings:
+ * - Address: 1
+ * - Baudrate: 9600
+ * - All temperature corrections: 0
+ *
+ * WARNING: Device will be unresponsive until power cycled!
+ *
+ * @param fd File descriptor for the serial port
+ * @param adr Device address
+ *
+ * @return STATUS_OK on success, otherwise an error code from AppStatus enum
+ */
+AppStatus factory_reset(int fd, uint8_t adr);
 
 #endif /* WRITE_FUNCTIONS_H */

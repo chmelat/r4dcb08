@@ -30,6 +30,7 @@ void help(void)
         "-s [ch,Tc]\tSet temperature correction Tc for channel ch",
         "-m\t\tEnable three point median filter",
         "-f\t\tEnable one shot measure without timestamp",
+        "-r\t\tFactory reset (resets address to 1, baudrate to 9600, corrections to 0)",
         0
     };
   

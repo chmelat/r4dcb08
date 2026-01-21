@@ -49,6 +49,8 @@ const char* get_error_message(AppStatus status) {
             return "Failed to read correction";
         case ERROR_MEDIAN_FILTER:
             return "Median filter failure";
+        case ERROR_FACTORY_RESET:
+            return "Failed to factory reset";
         default:
             return "Unknown error";
     }

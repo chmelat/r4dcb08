@@ -19,6 +19,7 @@ typedef struct {
     float correction_temp;   /* Correction temperature */
     int enable_median_filter;/* 1 to enable median filter, 0 otherwise */
     int one_shot;            /* 1 enable one shot measure, 0 othervise */
+    int factory_reset;       /* 1 to perform factory reset, 0 otherwise */
 } ProgramConfig;
 
 /**

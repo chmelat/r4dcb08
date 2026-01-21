@@ -1,6 +1,6 @@
 # R4DCB08 Temperature Sensor Utility
 
-**V1.9 (2026-01-21)**
+**V1.10 (2026-01-21)**
 
 A command-line utility for communicating with R4DCB08 temperature sensor modules via serial port.
 
@@ -105,6 +105,12 @@ Note: `-a 1` specifies current address, `-w 5` sets new address.
 ```
 Baudrate codes: 0=1200, 1=2400, 2=4800, 3=9600, 4=19200. Change takes effect after device power cycle.
 
+10. **Factory reset:**
+```bash
+./r4dcb08 -r
+```
+Writes factory defaults to EEPROM (address 1, baudrate 9600, all corrections 0). Power cycle needed to apply.
+
 ### Command Line Options
 
 | Option | Description | Default |
@@ -120,6 +126,7 @@ Baudrate codes: 0=1200, 1=2400, 2=4800, 3=9600, 4=19200. Change takes effect aft
 | `-s [ch,value]` | Set temperature correction for channel (e.g., `-s 3,1.5`) | - |
 | `-m` | Enable three-point median filter (reduces noise) | Off |
 | `-f` | One-shot measurement without timestamp | Off |
+| `-r` | Factory reset (resets to address 1, baudrate 9600, corrections 0) | - |
 | `-h` or `-?` | Display help | - |
 
 ### Understanding `-b` vs `-x`
@@ -137,6 +144,10 @@ Normally you only need `-b` if default 9600 doesn't work. Use `-x` only when you
 - Multiple devices can share one RS485 bus using different addresses
 
 ## Changelog
+
+### V1.10 (2026-01-21)
+- Added factory reset command (-r option)
+- Resets device to address 1, baudrate 9600, all corrections 0
 
 ### V1.9 (2026-01-21)
 - Replaced deprecated signal() with POSIX sigaction()
@@ -181,12 +192,18 @@ Modbus RTU over serial port:
 
 ### Register Map
 
-| Register | Description |
-|----------|-------------|
-| 0x0000-0x0007 | Temperature readings (channels 1-8) |
-| 0x0008-0x000F | Temperature correction values |
-| 0x00FE | Device address |
-| 0x00FF | Baudrate setting |
+| Register | Description | R/W | Values |
+|----------|-------------|-----|--------|
+| 0x0000-0x0007 | Temperature readings (channels 1-8) | R | signed int16 / 10 |
+| 0x0008-0x000F | Temperature correction values | R/W | signed int16 / 10 |
+| 0x00FD | Automatic report interval | R/W | 0-255 (seconds, 0=disabled) |
+| 0x00FE | Device address | R/W | 1-254 |
+| 0x00FF | Baudrate setting | R/W | 0-4 (see codes below) |
+| 0x00FF | Factory reset | W | 5 (triggers reset) |
+
+**Baudrate codes:** 0=1200, 1=2400, 2=4800, 3=9600, 4=19200
+
+**Factory reset:** Writing value 5 to register 0x00FF writes default values to EEPROM (address=1, baudrate=9600, corrections=0). Power cycle needed to load new settings from EEPROM.
 
 ### Error Codes
 
