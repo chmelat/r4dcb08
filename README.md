@@ -1,6 +1,6 @@
 # R4DCB08 Temperature Sensor Utility
 
-**V1.10 (2026-01-21)**
+**V1.11 (2026-01-23)**
 
 A command-line utility for communicating with R4DCB08 temperature sensor modules via serial port.
 
@@ -111,6 +111,19 @@ Baudrate codes: 0=1200, 1=2400, 2=4800, 3=9600, 4=19200. Change takes effect aft
 ```
 Writes factory defaults to EEPROM (address 1, baudrate 9600, all corrections 0). Power cycle needed to apply.
 
+11. **Scan RS485 bus for devices:**
+```bash
+./r4dcb08 -S
+```
+Scans addresses 1-254 and reports all responding devices. Useful for discovering device addresses on the bus.
+
+Example output:
+```
+Found 2 device(s):
+  1
+  15
+```
+
 ### Command Line Options
 
 | Option | Description | Default |
@@ -127,6 +140,7 @@ Writes factory defaults to EEPROM (address 1, baudrate 9600, all corrections 0).
 | `-m` | Enable three-point median filter (reduces noise) | Off |
 | `-f` | One-shot measurement without timestamp | Off |
 | `-r` | Factory reset (resets to address 1, baudrate 9600, corrections 0) | - |
+| `-S` | Scan RS485 bus for devices (addresses 1-254) | - |
 | `-h` or `-?` | Display help | - |
 
 ### Understanding `-b` vs `-x`
@@ -144,6 +158,11 @@ Normally you only need `-b` if default 9600 doesn't work. Use `-x` only when you
 - Multiple devices can share one RS485 bus using different addresses
 
 ## Changelog
+
+### V1.11 (2026-01-23)
+- Added RS485 bus scan feature (-S option)
+- Scans addresses 1-254 with 100ms timeout per address
+- Reports all responding Modbus RTU devices
 
 ### V1.10 (2026-01-21)
 - Added factory reset command (-r option)

@@ -31,13 +31,16 @@
  */
 static uint16_t CRC16_2(const uint8_t *buf, int len);
 static int read_with_timeout(int fd, uint8_t *buffer, int size, int timeout_ms);
+static AppStatus received_packet_internal(int fd, PACKET *p_RP, int mode,
+                                          int timeout_ms, int quiet);
 
 /**********************************************************************/
 
 /*
- *  Receive a packet from the device
+ *  Receive a packet from the device (internal implementation)
  */
-AppStatus received_packet(int fd, PACKET *p_RP, int mode)
+static AppStatus received_packet_internal(int fd, PACKET *p_RP, int mode,
+                                          int timeout_ms, int quiet)
 {
     const char *msg = "received_packet";
     uint8_t buf[MAX_PACKET_SIZE];
@@ -48,54 +51,54 @@ AppStatus received_packet(int fd, PACKET *p_RP, int mode)
 
     /* Validate input parameters */
     if (p_RP == NULL) {
-        fprintf(stderr, "%s: NULL packet pointer\n", msg);
+        if (!quiet) fprintf(stderr, "%s: NULL packet pointer\n", msg);
         return ERROR_PACKET_NULL;
     }
 
     if (mode < 0 || mode >= RECEIVE_MODE_MAX) {
-        fprintf(stderr, "%s: %s (%d)\n", msg, ERR_INVALID_MODE, mode);
+        if (!quiet) fprintf(stderr, "%s: %s (%d)\n", msg, ERR_INVALID_MODE, mode);
         return ERROR_PACKET_MODE;
     }
 
     /* Read first byte (address) */
-    bytes_read = read_with_timeout(fd, buf, 1, READ_TIMEOUT_MS);
+    bytes_read = read_with_timeout(fd, buf, 1, timeout_ms);
     if (bytes_read != 1) {
-        fprintf(stderr, "%s: Timeout waiting for address byte\n", msg);
+        if (!quiet) fprintf(stderr, "%s: Timeout waiting for address byte\n", msg);
         return ERROR_PACKET_TIMEOUT;
     }
 
     /* Determine expected packet length based on mode */
     if (mode == RECEIVE_MODE_TEMPERATURE) {
         /* Read function code + length */
-        bytes_read = read_with_timeout(fd, buf + 1, 2, READ_TIMEOUT_MS);
+        bytes_read = read_with_timeout(fd, buf + 1, 2, timeout_ms);
         if (bytes_read != 2) {
-            fprintf(stderr, "%s: Timeout waiting for function and length bytes\n", msg);
+            if (!quiet) fprintf(stderr, "%s: Timeout waiting for function and length bytes\n", msg);
             return ERROR_PACKET_TIMEOUT;
         }
 
         /* Calculate total expected length */
         total_length = buf[2] + 5; /* ADDR + FUNC + LEN + DATA + CRC(2) */
-        
+
         /* Validate expected length */
         if (total_length < MIN_PACKET_SIZE || total_length > MAX_PACKET_SIZE) {
-            fprintf(stderr, "%s: %s, invalid total length: %d\n", 
+            if (!quiet) fprintf(stderr, "%s: %s, invalid total length: %d\n",
                     msg, ERR_INVALID_LENGTH, total_length);
             return ERROR_PACKET_OVERFLOW;
         }
 
         /* Read remaining data and CRC */
-        bytes_read = read_with_timeout(fd, buf + 3, total_length - 3, READ_TIMEOUT_MS);
+        bytes_read = read_with_timeout(fd, buf + 3, total_length - 3, timeout_ms);
         if (bytes_read != total_length - 3) {
-            fprintf(stderr, "%s: %s, expected %d bytes, got %d\n", 
+            if (!quiet) fprintf(stderr, "%s: %s, expected %d bytes, got %d\n",
                     msg, ERR_INVALID_LENGTH, total_length - 3, bytes_read);
             return ERROR_PACKET_TIMEOUT;
         }
-    } 
+    }
     else if (mode == RECEIVE_MODE_ACKNOWLEDGE) {
         /* Read remaining 7 bytes for acknowledge packet */
-        bytes_read = read_with_timeout(fd, buf + 1, 7, READ_TIMEOUT_MS);
+        bytes_read = read_with_timeout(fd, buf + 1, 7, timeout_ms);
         if (bytes_read != 7) {
-            fprintf(stderr, "%s: %s, expected 7 bytes, got %d\n", 
+            if (!quiet) fprintf(stderr, "%s: %s, expected 7 bytes, got %d\n",
                     msg, ERR_INVALID_LENGTH, bytes_read);
             return ERROR_PACKET_TIMEOUT;
         }
@@ -105,7 +108,7 @@ AppStatus received_packet(int fd, PACKET *p_RP, int mode)
     /* Extract packet fields */
     p_RP->addr = buf[0];
     p_RP->inst = buf[1];
-    
+
     if (mode == RECEIVE_MODE_TEMPERATURE) {
         p_RP->len = buf[2];
         /* Copy data bytes */
@@ -114,10 +117,10 @@ AppStatus received_packet(int fd, PACKET *p_RP, int mode)
         }
         /* Extract CRC */
         p_RP->CRC = UINT16(buf[total_length - 2], buf[total_length - 1]);
-        
+
         /* Verify CRC */
         crc_calculated = CRC16_2(buf, p_RP->len + 3);
-    } 
+    }
     else { /* RECEIVE_MODE_ACKNOWLEDGE */
         p_RP->len = 2;  /* Fixed data length for acknowledge */
         /* Copy data bytes - position is different for acknowledge packets */
@@ -126,16 +129,18 @@ AppStatus received_packet(int fd, PACKET *p_RP, int mode)
         }
         /* Extract CRC */
         p_RP->CRC = UINT16(buf[total_length - 2], buf[total_length - 1]);
-        
+
         /* Verify CRC */
         crc_calculated = CRC16_2(buf, p_RP->len + 4);
     }
 
     /* Check if calculated CRC matches received CRC */
     if (crc_calculated != p_RP->CRC) {
-        fprintf(stderr, "%s: %s, calculated: 0x%04X, received: 0x%04X\n", 
-                msg, ERR_CRC_MISMATCH, crc_calculated, p_RP->CRC);
-        print_packet(p_RP);
+        if (!quiet) {
+            fprintf(stderr, "%s: %s, calculated: 0x%04X, received: 0x%04X\n",
+                    msg, ERR_CRC_MISMATCH, crc_calculated, p_RP->CRC);
+            print_packet(p_RP);
+        }
         return ERROR_PACKET_CRC;
     }
 
@@ -143,6 +148,23 @@ AppStatus received_packet(int fd, PACKET *p_RP, int mode)
     usleep((useconds_t)(8000));
 
     return STATUS_OK;
+}
+
+/*
+ *  Receive a packet from the device
+ */
+AppStatus received_packet(int fd, PACKET *p_RP, int mode)
+{
+    return received_packet_internal(fd, p_RP, mode, READ_TIMEOUT_MS, 0);
+}
+
+/*
+ *  Receive a packet from the device with custom timeout
+ */
+AppStatus received_packet_timeout(int fd, PACKET *p_RP, int mode,
+                                  int timeout_ms, int quiet)
+{
+    return received_packet_internal(fd, p_RP, mode, timeout_ms, quiet);
 }
 
 /*

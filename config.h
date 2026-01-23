@@ -20,6 +20,7 @@ typedef struct {
     int enable_median_filter;/* 1 to enable median filter, 0 otherwise */
     int one_shot;            /* 1 enable one shot measure, 0 othervise */
     int factory_reset;       /* 1 to perform factory reset, 0 otherwise */
+    int scan_mode;           /* 1 to scan bus for devices, 0 otherwise */
 } ProgramConfig;
 
 /**

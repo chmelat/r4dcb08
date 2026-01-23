@@ -16,6 +16,7 @@
 #include "write_functions.h"
 #include "help_functions.h"
 #include "constants.h"
+#include "scan.h"
 
 /* External global variables */
 extern char *progname;
@@ -36,6 +37,7 @@ void init_config(ProgramConfig *config) {
     config->enable_median_filter = 0;
     config->one_shot = 0;
     config->factory_reset = 0;
+    config->scan_mode = 0;
 }
 
 /* Validate device address */
@@ -52,7 +54,7 @@ static AppStatus validate_device_address(uint8_t address) {
 AppStatus parse_arguments(int argc, char *argv[], ProgramConfig *config) {
     int c;
 
-    while ((c = getopt(argc, argv, "p:a:b:t:n:cw:s:x:mfrh?")) != -1) {
+    while ((c = getopt(argc, argv, "p:a:b:t:n:cw:s:x:mfrSh?")) != -1) {
         switch (c) {
             case 'p':  /* Port name */
                 config->port = optarg;
@@ -118,6 +120,9 @@ AppStatus parse_arguments(int argc, char *argv[], ProgramConfig *config) {
             case 'r':  /* Factory reset */
                 config->factory_reset = 1;
                 break;
+            case 'S':  /* Scan bus */
+                config->scan_mode = 1;
+                break;
             case 'h':  /* Help */
             case '?':  /* Help */
                 help();
@@ -168,6 +173,12 @@ AppStatus execute_command(ProgramConfig *config) {
     }
     
     /* Process commands in priority order */
+    if (config->scan_mode) {
+        status = scan_bus(fd, MIN_DEVICE_ADDRESS, MAX_DEVICE_ADDRESS);
+        close(fd);
+        return status;
+    }
+
     if (config->factory_reset) {
         status = factory_reset(fd, config->address);
         close(fd);

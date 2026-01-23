@@ -29,6 +29,19 @@ typedef enum {
 extern AppStatus received_packet(int fd, PACKET *p_RP, int mode);
 
 /**
+ * Receive a packet from the device with custom timeout
+ *
+ * @param fd         File descriptor of the serial port
+ * @param p_RP       Pointer to PACKET structure to store received data
+ * @param mode       Receiving mode (RECEIVE_MODE_TEMPERATURE or RECEIVE_MODE_ACKNOWLEDGE)
+ * @param timeout_ms Timeout in milliseconds
+ * @param quiet      If non-zero, suppress error messages (useful for scanning)
+ * @return           STATUS_OK on success, AppStatus error code on failure
+ */
+extern AppStatus received_packet_timeout(int fd, PACKET *p_RP, int mode,
+                                         int timeout_ms, int quiet);
+
+/**
  * Send a packet to the device
  *
  * @param fd        File descriptor of the serial port
