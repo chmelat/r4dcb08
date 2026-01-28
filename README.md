@@ -1,6 +1,6 @@
 # R4DCB08 Temperature Sensor Utility
 
-**V1.12 (2026-01-28)**
+**V1.13 (2026-01-28)**
 
 A command-line utility for communicating with R4DCB08 temperature sensor modules via serial port.
 
@@ -87,38 +87,85 @@ Press **Ctrl+C** to stop continuous measurements.
 ./r4dcb08 -m
 ```
 
+6. **Enable MAF filter** (moving average with trapezoidal weights):
+```bash
+./r4dcb08 -M 5
+```
+
+7. **Combine filters** (median → MAF pipeline):
+```bash
+./r4dcb08 -m -M 5 -n 4 -t 2
+```
+
+### Digital Filters
+
+The utility provides two digital filters that can be used separately or combined:
+
+**Median Filter (`-m`)**
+- Three-point median filter
+- Removes isolated spikes while preserving signal edges
+- Introduces 1 sample delay
+
+**MAF Filter (`-M n`)**
+- Moving Average Filter with trapezoidal weights
+- Window size `n` must be odd (3, 5, 7, ... 15)
+- Weights: `[0.5, 1, 1, ..., 1, 0.5]`
+- Formula: `MAF = (0.5·x[0] + x[1] + ... + x[n-2] + 0.5·x[n-1]) / (n-1)`
+- Smooths high-frequency noise while reducing edge distortion compared to simple moving average
+
+**Filter Workflow**
+
+When both filters are enabled, data flows through the pipeline:
+```
+Raw data → Median Filter → MAF Filter → Output
+```
+
+Example with 4 channels, 2-second interval, median + MAF(5):
+```bash
+$ ./r4dcb08 -m -M 5 -n 4 -t 2
+# Active three-point median filter for all data ...
+# Active MAF filter (window size 5) for all data ...
+#
+# Date                  Ch1  Ch2  Ch3  Ch4
+2026-01-28 10:15:03.12  22.5 23.1 21.8 22.0
+2026-01-28 10:15:05.12  22.5 23.0 21.9 22.0
+2026-01-28 10:15:07.12  22.5 23.1 21.8 22.0
+^C
+Received SIGINT (Ctrl+C), measurement stopped
+```
+
 ### Device Configuration
 
-6. **Read current temperature correction values:**
+8. **Read current temperature correction values:**
 ```bash
 ./r4dcb08 -c
 ```
 
-7. **Set temperature correction for channel 3 to +1.5°C:**
+9. **Set temperature correction for channel 3 to +1.5°C:**
 ```bash
 ./r4dcb08 -s 3,1.5
 ```
 Temperature correction is useful when sensor readings need calibration (e.g., sensor shows 21.0°C but actual temperature is 22.5°C → set correction to +1.5).
 
-8. **Change device address from 1 to 5:**
+10. **Change device address from 1 to 5:**
 ```bash
 ./r4dcb08 -a 1 -w 5
 ```
 Note: `-a 1` specifies current address, `-w 5` sets new address.
 
-9. **Change device baudrate to 19200:**
+11. **Change device baudrate to 19200:**
 ```bash
 ./r4dcb08 -x 4
 ```
 Baudrate codes: 0=1200, 1=2400, 2=4800, 3=9600, 4=19200. Change takes effect after device power cycle.
 
-10. **Factory reset:**
+12. **Factory reset:**
 ```bash
 ./r4dcb08 -r
 ```
 Writes factory defaults to EEPROM (address 1, baudrate 9600, all corrections 0). Power cycle needed to apply.
 
-11. **Scan RS485 bus for devices:**
+13. **Scan RS485 bus for devices:**
 ```bash
 ./r4dcb08 -S
 ```
@@ -145,6 +192,7 @@ Found 2 device(s):
 | `-x [0-4]` | Write device baudrate (0=1200, 1=2400, 2=4800, 3=9600, 4=19200) | - |
 | `-s [ch,value]` | Set temperature correction for channel (e.g., `-s 3,1.5`) | - |
 | `-m` | Enable three-point median filter (reduces noise) | Off |
+| `-M [3-15]` | Enable MAF filter with window size (must be odd) | Off |
 | `-f` | One-shot measurement without timestamp | Off |
 | `-r` | Factory reset (resets to address 1, baudrate 9600, corrections 0) | - |
 | `-S` | Scan RS485 bus for devices (addresses 1-254) | - |
@@ -165,6 +213,14 @@ Normally you only need `-b` if default 9600 doesn't work. Use `-x` only when you
 - Multiple devices can share one RS485 bus using different addresses
 
 ## Changelog
+
+### V1.13 (2026-01-28)
+- Added MAF (Moving Average Filter) with trapezoidal weights (-M option)
+- Window size configurable (odd values 3-15)
+- Filters can be chained: median → MAF
+
+### V1.12 (2026-01-28)
+- Minor code improvements
 
 ### V1.11 (2026-01-23)
 - Added RS485 bus scan feature (-S option)

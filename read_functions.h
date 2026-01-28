@@ -10,17 +10,20 @@
 
 /**
  * Read and print temperature from 1..n channels
- * 
+ *
  * @param fd File descriptor for the serial port
  * @param adr Device address
  * @param n Number of channels to read (1-8)
  * @param dt Time step between measurements in seconds
  * @param m_f Flag to enable (1) or disable (0) three-point median filter
+ * @param maf_f Flag to enable (1) or disable (0) MAF filter
+ * @param maf_window MAF window size (3-15, odd)
  * @param one_shot Flag to enable (1) or disable (0) one shot measure without timestamp
- * 
+ *
  * @return STATUS_OK on success, otherwise an error code from AppStatus enum
  */
-AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f, int one_shot);
+AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f,
+                    int maf_f, int maf_window, int one_shot);
 
 /**
  * Read and print correction temperature for all channels

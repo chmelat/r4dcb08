@@ -35,6 +35,8 @@ void init_config(ProgramConfig *config) {
     config->channel = -1;
     config->correction_temp = 0.0;
     config->enable_median_filter = 0;
+    config->enable_maf_filter = 0;
+    config->maf_window_size = 5;
     config->one_shot = 0;
     config->factory_reset = 0;
     config->scan_mode = 0;
@@ -54,7 +56,7 @@ static AppStatus validate_device_address(uint8_t address) {
 AppStatus parse_arguments(int argc, char *argv[], ProgramConfig *config) {
     int c;
 
-    while ((c = getopt(argc, argv, "p:a:b:t:n:cw:s:x:mfrSh?")) != -1) {
+    while ((c = getopt(argc, argv, "p:a:b:t:n:cw:s:x:mM:frSh?")) != -1) {
         switch (c) {
             case 'p':  /* Port name */
                 config->port = optarg;
@@ -111,8 +113,22 @@ AppStatus parse_arguments(int argc, char *argv[], ProgramConfig *config) {
                     return ERROR_INVALID_BAUDRATE;
                 }
                 break;
-            case 'm':  /* Enable filter */
+            case 'm':  /* Enable median filter */
                 config->enable_median_filter = 1;
+                break;
+            case 'M':  /* Enable MAF filter */
+                config->maf_window_size = atoi(optarg);
+                if (config->maf_window_size < 3 || config->maf_window_size > 15) {
+                    fprintf(stderr, "MAF window size %d is not 3..15!\n",
+                            config->maf_window_size);
+                    return ERROR_INVALID_CHANNEL;
+                }
+                if (config->maf_window_size % 2 == 0) {
+                    fprintf(stderr, "MAF window size %d must be odd!\n",
+                            config->maf_window_size);
+                    return ERROR_INVALID_CHANNEL;
+                }
+                config->enable_maf_filter = 1;
                 break;
             case 'f':  /* Enable one shot */
                 config->one_shot = 1;
@@ -210,12 +226,19 @@ AppStatus execute_command(ProgramConfig *config) {
         return status;
     }
 
-    if (config->enable_median_filter) 
-        printf("# Active three-point median filter for all data ...\n#\n");
+    if (config->enable_median_filter)
+        printf("# Active three-point median filter for all data ...\n");
+    if (config->enable_maf_filter)
+        printf("# Active MAF filter (window size %d) for all data ...\n",
+               config->maf_window_size);
+    if (config->enable_median_filter || config->enable_maf_filter)
+        printf("#\n");
 
     /* Default action - read temperature */
-    status = read_temp(fd, config->address, config->num_channels, 
-                     config->time_step, config->enable_median_filter, config->one_shot);
+    status = read_temp(fd, config->address, config->num_channels,
+                     config->time_step, config->enable_median_filter,
+                     config->enable_maf_filter, config->maf_window_size,
+                     config->one_shot);
     
     fflush(stdout);
     close(fd);

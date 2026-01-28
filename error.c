@@ -51,6 +51,8 @@ const char* get_error_message(AppStatus status) {
             return "Median filter failure";
         case ERROR_FACTORY_RESET:
             return "Failed to factory reset";
+        case ERROR_MAF_FILTER:
+            return "MAF filter failure";
         default:
             return "Unknown error";
     }

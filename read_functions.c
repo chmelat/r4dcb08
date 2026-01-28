@@ -13,6 +13,7 @@
 #include "error.h"
 #include "monada.h"
 #include "median_filter.h"
+#include "maf_filter.h"
 #include "now.h"
 #include "typedef.h"
 #include "define_error_resp.h"
@@ -63,7 +64,8 @@ AppStatus read_correction(int fd, uint8_t adr)
 /**
  * Read and print temperature from 1..n channels
  */
-AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f, int one_shot)
+AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f,
+                    int maf_f, int maf_window, int one_shot)
 {
     int verb = 0;
     PACKET pr;
@@ -74,8 +76,10 @@ AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f, int one_shot)
     int rc;
     float T[MAX_CHANNELS];
     float T_f[MAX_CHANNELS];
+    float T_maf[MAX_CHANNELS];
     char *sample_time = NULL;
     char sample_t_f[DBUF];  /* Sample time after filtering */
+    char sample_t_maf[DBUF]; /* Sample time after MAF filtering */
     AppStatus status;
 
     /* Input validation */
@@ -89,6 +93,15 @@ AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f, int one_shot)
 
     /* Set up signal handlers for clean termination */
     init_signal_handlers();
+
+    /* Initialize MAF filter if enabled */
+    if (maf_f) {
+        rc = maf_init(maf_window);
+        if (rc != MAF_SUCCESS) {
+            fprintf(stderr, "MAF filter initialization failed with code %d\n", rc);
+            return ERROR_MAF_FILTER;
+        }
+    }
 
     /* Register address (2 byte) + Read number (2 byte) */       
     input_data[0] = 0x00; 
@@ -124,7 +137,7 @@ AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f, int one_shot)
         }
 
         if (m_f) {
-          rc = median_filter(sample_time, n, T, sample_t_f,T_f);
+          rc = median_filter(sample_time, n, T, sample_t_f, T_f);
           if (rc != MF_SUCCESS) {
             fprintf(stderr, "Median filter failed with code %d\n", rc);
             return ERROR_MEDIAN_FILTER;
@@ -133,6 +146,19 @@ AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f, int one_shot)
           sample_time[DBUF - 1] = '\0';
           for (i=0; i<n; i++) {
             T[i] = T_f[i];
+          }
+        }
+
+        if (maf_f) {
+          rc = maf_filter(sample_time, n, T, sample_t_maf, T_maf);
+          if (rc != MAF_SUCCESS) {
+            fprintf(stderr, "MAF filter failed with code %d\n", rc);
+            return ERROR_MAF_FILTER;
+          }
+          strncpy(sample_time, sample_t_maf, DBUF - 1);
+          sample_time[DBUF - 1] = '\0';
+          for (i=0; i<n; i++) {
+            T[i] = T_maf[i];
           }
         }
 

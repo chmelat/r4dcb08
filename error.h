@@ -35,7 +35,8 @@ typedef enum {
     ERROR_READ_TEMPERATURE = -33,/* Failed to read temperature */
     ERROR_READ_CORRECTION = -34, /* Failed to read correction */
     ERROR_MEDIAN_FILTER = -35,   /* Median filter failure */
-    ERROR_FACTORY_RESET = -36    /* Failed to factory reset */
+    ERROR_FACTORY_RESET = -36,   /* Failed to factory reset */
+    ERROR_MAF_FILTER = -37       /* MAF filter failure */
 } AppStatus;
 
 /**

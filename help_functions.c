@@ -29,6 +29,7 @@ void help(void)
         "-x [n]\t\tSet baud rate on R4DCB08 device {0:1200, 1:2400, 2:4800, 3:9600, 4:19200}",
         "-s [ch,Tc]\tSet temperature correction Tc for channel ch",
         "-m\t\tEnable three point median filter",
+        "-M [n]\t\tEnable MAF filter with window size n (odd, 3-15)",
         "-f\t\tEnable one shot measure without timestamp",
         "-r\t\tFactory reset (resets address to 1, baudrate to 9600, corrections to 0)",
         "-S\t\tScan RS485 bus for devices (addresses 1-254)",
