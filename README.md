@@ -26,6 +26,13 @@ This utility allows you to:
 make
 ```
 
+### System-wide Installation (optional)
+
+```bash
+sudo make install    # Installs to /usr/local/bin
+sudo make uninstall  # Removes from /usr/local/bin
+```
+
 ## Quick Start
 
 1. Connect the R4DCB08 module to your computer via USB-RS485 adapter

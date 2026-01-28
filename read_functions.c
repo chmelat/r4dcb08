@@ -129,7 +129,8 @@ AppStatus read_temp(int fd, uint8_t adr, int n, int dt, int m_f, int one_shot)
             fprintf(stderr, "Median filter failed with code %d\n", rc);
             return ERROR_MEDIAN_FILTER;
           }
-          strcpy(sample_time, sample_t_f);
+          strncpy(sample_time, sample_t_f, DBUF - 1);
+          sample_time[DBUF - 1] = '\0';
           for (i=0; i<n; i++) {
             T[i] = T_f[i];
           }

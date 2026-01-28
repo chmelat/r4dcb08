@@ -120,6 +120,13 @@ AppStatus write_correction(int fd, uint8_t adr, uint8_t ch, float T_c)
         return ERROR_INVALID_CHANNEL;
     }
 
+    /* Validate temperature correction range */
+    if (T_c < MIN_TEMPERATURE || T_c > MAX_TEMPERATURE) {
+        fprintf(stderr, "Temperature correction %.1f out of range (%.1f to %.1f)\n",
+                T_c, MIN_TEMPERATURE, MAX_TEMPERATURE);
+        return ERROR_WRITE_CORRECTION;
+    }
+
     T = (int16_t)(10*T_c);
 
     /* Register address (2 byte) + Setting content (2 byte) */

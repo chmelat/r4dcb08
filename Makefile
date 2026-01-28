@@ -45,11 +45,11 @@ build: $(PROGRAM) $(PROGRAM1)
 
 # install závisi na prelozeni projektu, volat ho muze jen root
 install: build
-	cp $(PROGRAM) ~/bin
+	cp $(PROGRAM) /usr/local/bin
 
 # uninstall (only for root)
 uninstall:
-	rm -f ~/bin/$(PROGRAM) 
+	rm -f /usr/local/bin/$(PROGRAM) 
 
 # Clean files
 clean:
