@@ -1,6 +1,6 @@
 # R4DCB08 Temperature Sensor Utility
 
-**V1.11 (2026-01-23)**
+**V1.12 (2026-01-28)**
 
 A command-line utility for communicating with R4DCB08 temperature sensor modules via serial port.
 
