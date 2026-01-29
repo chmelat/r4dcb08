@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
+#include <systemd/sd-daemon.h>
 
 #include "mqtt_config.h"
 #include "mqtt_error.h"
@@ -229,6 +230,9 @@ static int daemon_loop(MqttConfig *config)
 
     mqtt_log_info("Daemon started, interval=%d s", config->interval);
 
+    /* Notify systemd we are ready */
+    sd_notify(0, "READY=1");
+
     /* Main loop */
     while (running) {
         /* Check for SIGHUP (config reload) */
@@ -273,6 +277,8 @@ static int daemon_loop(MqttConfig *config)
             }
         } else {
             consecutive_errors = 0;
+            /* Notify systemd watchdog on successful operation */
+            sd_notify(0, "WATCHDOG=1");
         }
 
         /* Sleep for interval */
@@ -285,6 +291,9 @@ static int daemon_loop(MqttConfig *config)
 
     /* Cleanup */
     mqtt_log_info("Shutting down...");
+
+    /* Notify systemd we are stopping */
+    sd_notify(0, "STOPPING=1");
 
     /* Publish offline status before disconnecting */
     if (mqtt_client_is_connected(&client)) {

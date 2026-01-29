@@ -32,7 +32,7 @@ DBG =
 CFLAGS = -Wall -Wextra -I..
 
 # Libraries
-LIBS = -lmosquitto
+LIBS = -lmosquitto -lsystemd
 
 # Installation paths
 PREFIX = /usr/local
