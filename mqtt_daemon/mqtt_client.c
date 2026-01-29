@@ -1,13 +1,26 @@
 /*
  * MQTT client wrapper for libmosquitto
- * V1.0/2026-01-29
+ * V1.1/2026-01-29
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdatomic.h>
 #include "mqtt_client.h"
 #include "mqtt_error.h"
+
+/* Helper to safely set connected flag from callback thread */
+static inline void set_connected(MqttClient *client, int value)
+{
+    /* Use memory barrier for visibility across threads */
+    __atomic_store_n(&client->connected, value, __ATOMIC_SEQ_CST);
+}
+
+static inline int get_connected(const MqttClient *client)
+{
+    return __atomic_load_n(&client->connected, __ATOMIC_SEQ_CST);
+}
 
 /* Callback functions */
 static void on_connect(struct mosquitto *mosq, void *userdata, int rc)
@@ -16,11 +29,11 @@ static void on_connect(struct mosquitto *mosq, void *userdata, int rc)
     (void)mosq;
 
     if (rc == 0) {
-        client->connected = 1;
+        set_connected(client, 1);
         client->reconnect_delay = MQTT_RECONNECT_MIN_DELAY;
         mqtt_log_info("Connected to MQTT broker");
     } else {
-        client->connected = 0;
+        set_connected(client, 0);
         mqtt_log_error("Connection failed: %s", mosquitto_connack_string(rc));
     }
 }
@@ -30,7 +43,7 @@ static void on_disconnect(struct mosquitto *mosq, void *userdata, int rc)
     MqttClient *client = (MqttClient *)userdata;
     (void)mosq;
 
-    client->connected = 0;
+    set_connected(client, 0);
     if (rc == 0) {
         mqtt_log_info("Disconnected from MQTT broker");
     } else {
@@ -121,6 +134,42 @@ MqttStatus mqtt_client_create(MqttClient *client, const MqttConfig *config)
         }
     }
 
+    /* Configure TLS if enabled */
+    if (config->use_tls) {
+        int rc;
+
+        /* Set CA certificate */
+        rc = mosquitto_tls_set(client->mosq,
+                               config->tls_ca_file[0] != '\0' ? config->tls_ca_file : NULL,
+                               NULL,  /* CA path */
+                               config->tls_cert_file[0] != '\0' ? config->tls_cert_file : NULL,
+                               config->tls_key_file[0] != '\0' ? config->tls_key_file : NULL,
+                               NULL); /* Key password callback */
+
+        if (rc != MOSQ_ERR_SUCCESS) {
+            mqtt_log_error("Failed to configure TLS: %s", mosquitto_strerror(rc));
+            mosquitto_destroy(client->mosq);
+            client->mosq = NULL;
+            return MQTT_ERR_MOSQUITTO_INIT;
+        }
+
+        /* Set TLS options */
+        rc = mosquitto_tls_opts_set(client->mosq, 1, NULL, NULL);
+        if (rc != MOSQ_ERR_SUCCESS) {
+            mqtt_log_warning("Failed to set TLS options: %s", mosquitto_strerror(rc));
+        }
+
+        /* Configure certificate verification */
+        if (config->tls_insecure) {
+            rc = mosquitto_tls_insecure_set(client->mosq, true);
+            if (rc != MOSQ_ERR_SUCCESS) {
+                mqtt_log_warning("Failed to set TLS insecure mode: %s", mosquitto_strerror(rc));
+            }
+        }
+
+        mqtt_log_info("TLS configured%s", config->tls_insecure ? " (insecure mode)" : "");
+    }
+
     return MQTT_OK;
 }
 
@@ -166,11 +215,11 @@ MqttStatus mqtt_client_connect(MqttClient *client)
     }
 
     /* Wait briefly for connection callback */
-    for (int i = 0; i < 50 && !client->connected; i++) {
+    for (int i = 0; i < 50 && !get_connected(client); i++) {
         usleep(100000);  /* 100ms */
     }
 
-    if (!client->connected) {
+    if (!get_connected(client)) {
         mqtt_log_warning("Connection callback not received yet");
     }
 
@@ -192,7 +241,7 @@ MqttStatus mqtt_client_disconnect(MqttClient *client)
         mqtt_log_warning("Disconnect error: %s", mosquitto_strerror(rc));
     }
 
-    client->connected = 0;
+    set_connected(client, 0);
     return MQTT_OK;
 }
 
@@ -214,7 +263,7 @@ int mqtt_client_is_connected(const MqttClient *client)
     if (client == NULL) {
         return 0;
     }
-    return client->connected;
+    return get_connected(client);
 }
 
 MqttStatus mqtt_client_reconnect(MqttClient *client)
@@ -225,7 +274,7 @@ MqttStatus mqtt_client_reconnect(MqttClient *client)
         return MQTT_ERR_RECONNECT;
     }
 
-    if (client->connected) {
+    if (get_connected(client)) {
         return MQTT_OK;
     }
 
@@ -246,11 +295,11 @@ MqttStatus mqtt_client_reconnect(MqttClient *client)
     }
 
     /* Wait for connection callback */
-    for (int i = 0; i < 50 && !client->connected; i++) {
+    for (int i = 0; i < 50 && !get_connected(client); i++) {
         usleep(100000);  /* 100ms */
     }
 
-    if (client->connected) {
+    if (get_connected(client)) {
         client->reconnect_delay = MQTT_RECONNECT_MIN_DELAY;
         return MQTT_OK;
     }
@@ -295,7 +344,7 @@ MqttStatus mqtt_client_publish_raw(MqttClient *client, const char *full_topic,
         return MQTT_ERR_PUBLISH;
     }
 
-    if (!client->connected) {
+    if (!get_connected(client)) {
         mqtt_log_debug("Not connected, cannot publish");
         return MQTT_ERR_CONNECT;
     }

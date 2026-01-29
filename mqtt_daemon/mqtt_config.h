@@ -15,10 +15,14 @@
 #define MQTT_DEFAULT_CHANNELS 8
 #define MQTT_DEFAULT_HOST "localhost"
 #define MQTT_DEFAULT_MQTT_PORT 1883
+#define MQTT_DEFAULT_MQTT_PORT_TLS 8883
 #define MQTT_DEFAULT_TOPIC "sensors/r4dcb08"
 #define MQTT_DEFAULT_INTERVAL 10
 #define MQTT_DEFAULT_QOS 1
 #define MQTT_DEFAULT_KEEPALIVE 60
+
+/* Environment variable for password */
+#define MQTT_PASSWORD_ENV "MQTT_PASSWORD"
 
 /* Maximum string lengths */
 #define MQTT_MAX_PATH 256
@@ -57,6 +61,16 @@ typedef struct {
     int enable_median_filter;
     int enable_maf_filter;
     int maf_window_size;
+
+    /* TLS settings */
+    int use_tls;
+    char tls_ca_file[MQTT_MAX_PATH];
+    char tls_cert_file[MQTT_MAX_PATH];
+    char tls_key_file[MQTT_MAX_PATH];
+    int tls_insecure;  /* Skip certificate verification (testing only) */
+
+    /* Password file (more secure than command line) */
+    char password_file[MQTT_MAX_PATH];
 } MqttConfig;
 
 /**
@@ -106,5 +120,33 @@ void mqtt_config_print(const MqttConfig *config);
  * @param program_name Name of the program
  */
 void mqtt_config_usage(const char *program_name);
+
+/**
+ * Load password from file or environment variable
+ * Priority: 1) password_file, 2) MQTT_PASSWORD env, 3) config file value
+ *
+ * @param config Pointer to configuration structure
+ * @return MQTT_OK on success, error code on failure
+ */
+MqttStatus mqtt_config_load_password(MqttConfig *config);
+
+/**
+ * Clear sensitive data from configuration (password)
+ * Call after credentials have been passed to MQTT library
+ *
+ * @param config Pointer to configuration structure
+ */
+void mqtt_config_clear_sensitive(MqttConfig *config);
+
+/**
+ * Safe string to integer conversion with validation
+ *
+ * @param str String to convert
+ * @param result Pointer to store result
+ * @param min Minimum valid value
+ * @param max Maximum valid value
+ * @return 0 on success, -1 on error
+ */
+int mqtt_config_parse_int(const char *str, int *result, int min, int max);
 
 #endif /* MQTT_CONFIG_H */

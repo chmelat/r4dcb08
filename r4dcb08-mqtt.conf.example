@@ -18,14 +18,19 @@ channels = 8
 # MQTT broker hostname or IP
 host = localhost
 
-# MQTT broker port
+# MQTT broker port (1883 for plain, 8883 for TLS)
 mqtt_port = 1883
 
 # MQTT username (leave empty for anonymous)
 user =
 
-# MQTT password
-password =
+# Password file (more secure than storing password directly)
+# File should contain only the password, no newline handling needed
+# Alternatively, set MQTT_PASSWORD environment variable
+password_file =
+
+# Direct password (NOT RECOMMENDED - use password_file instead)
+# password =
 
 # Topic prefix for publishing
 # Temperatures will be published to: {topic}/{address}/temperature/ch1 ... chN
@@ -43,9 +48,26 @@ retain = true
 # Keepalive interval in seconds
 keepalive = 60
 
+[tls]
+# Enable TLS/SSL encryption
+# tls = true
+
+# CA certificate file (required for TLS unless tls_insecure is set)
+# tls_ca = /etc/ssl/certs/ca-certificates.crt
+
+# Client certificate and key (optional, for mutual TLS)
+# tls_cert = /etc/mqtt/client.crt
+# tls_key = /etc/mqtt/client.key
+
+# Skip certificate verification (TESTING ONLY - NOT FOR PRODUCTION!)
+# tls_insecure = false
+
 [daemon]
 # Measurement interval in seconds
 interval = 10
+
+# PID file location
+pid_file = /var/run/r4dcb08-mqtt.pid
 
 # Enable verbose logging
 verbose = false

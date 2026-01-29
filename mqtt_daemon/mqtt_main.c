@@ -1,6 +1,6 @@
 /*
  * R4DCB08 MQTT daemon main entry point
- * V1.0/2026-01-29
+ * V1.1/2026-01-29
  *
  * Reads temperatures from R4DCB08 sensor via Modbus RTU
  * and publishes to MQTT broker using libmosquitto.
@@ -22,7 +22,7 @@
 
 /* Program name for logging */
 #define PROGRAM_NAME "r4dcb08-mqtt"
-#define PROGRAM_VERSION "1.0"
+#define PROGRAM_VERSION "1.1"
 
 /* Global flag for graceful shutdown */
 static volatile sig_atomic_t running = 1;
@@ -56,10 +56,41 @@ static void setup_signals(void)
     signal(SIGPIPE, SIG_IGN);
 }
 
+/* Write PID file */
+static int write_pid_file(const char *pid_file)
+{
+    FILE *fp;
+
+    if (pid_file == NULL || pid_file[0] == '\0') {
+        return 0;  /* No PID file requested */
+    }
+
+    fp = fopen(pid_file, "w");
+    if (fp == NULL) {
+        mqtt_log_error("Cannot create PID file %s: %s", pid_file, strerror(errno));
+        return -1;
+    }
+
+    fprintf(fp, "%d\n", getpid());
+    fclose(fp);
+
+    mqtt_log_debug("PID file created: %s", pid_file);
+    return 0;
+}
+
+/* Remove PID file */
+static void remove_pid_file(const char *pid_file)
+{
+    if (pid_file != NULL && pid_file[0] != '\0') {
+        unlink(pid_file);
+    }
+}
+
 /* Daemonize process */
 static int daemonize(void)
 {
     pid_t pid;
+    int fd;
 
     /* Fork off the parent process */
     pid = fork();
@@ -70,7 +101,7 @@ static int daemonize(void)
 
     /* Exit parent */
     if (pid > 0) {
-        exit(0);
+        _exit(0);  /* Use _exit to avoid flushing stdio buffers */
     }
 
     /* Create new session */
@@ -87,7 +118,7 @@ static int daemonize(void)
     }
 
     if (pid > 0) {
-        exit(0);
+        _exit(0);
     }
 
     /* Change working directory */
@@ -96,18 +127,43 @@ static int daemonize(void)
         return -1;
     }
 
-    /* Set file mode mask */
-    umask(0);
+    /* Set restrictive file mode mask */
+    umask(027);  /* rwxr-x--- for directories, rw-r----- for files */
 
     /* Close standard file descriptors */
     close(STDIN_FILENO);
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
 
-    /* Redirect to /dev/null */
-    open("/dev/null", O_RDONLY);  /* stdin */
-    open("/dev/null", O_WRONLY);  /* stdout */
-    open("/dev/null", O_WRONLY);  /* stderr */
+    /* Redirect stdin to /dev/null */
+    fd = open("/dev/null", O_RDONLY);
+    if (fd < 0) {
+        return -1;
+    }
+    if (fd != STDIN_FILENO) {
+        dup2(fd, STDIN_FILENO);
+        close(fd);
+    }
+
+    /* Redirect stdout to /dev/null */
+    fd = open("/dev/null", O_WRONLY);
+    if (fd < 0) {
+        return -1;
+    }
+    if (fd != STDOUT_FILENO) {
+        dup2(fd, STDOUT_FILENO);
+        close(fd);
+    }
+
+    /* Redirect stderr to /dev/null */
+    fd = open("/dev/null", O_WRONLY);
+    if (fd < 0) {
+        return -1;
+    }
+    if (fd != STDERR_FILENO) {
+        dup2(fd, STDERR_FILENO);
+        close(fd);
+    }
 
     return 0;
 }
@@ -141,6 +197,7 @@ static int daemon_loop(MqttConfig *config)
     status = mqtt_temp_open(&temp_ctx);
     if (status != MQTT_OK) {
         mqtt_log_error("Failed to open serial port");
+        mqtt_temp_close(&temp_ctx);  /* Clean up any partially initialized state */
         mqtt_client_lib_cleanup();
         return 1;
     }
@@ -153,6 +210,9 @@ static int daemon_loop(MqttConfig *config)
         mqtt_client_lib_cleanup();
         return 1;
     }
+
+    /* Clear password from memory after it's been passed to mosquitto */
+    mqtt_config_clear_sensitive(config);
 
     /* Connect to MQTT broker */
     status = mqtt_client_connect(&client);
@@ -269,6 +329,13 @@ int main(int argc, char *argv[])
         mqtt_config_parse_args(argc, argv, &config);
     }
 
+    /* Load password from file or environment */
+    status = mqtt_config_load_password(&config);
+    if (status != MQTT_OK) {
+        fprintf(stderr, "Error loading password\n");
+        return 1;
+    }
+
     /* Validate configuration */
     status = mqtt_config_validate(&config);
     if (status != MQTT_OK) {
@@ -299,6 +366,13 @@ int main(int argc, char *argv[])
         /* Re-initialize logging after daemonization */
         mqtt_log_init(1, PROGRAM_NAME);
         mqtt_log_set_verbose(config.verbose);
+
+        /* Create PID file */
+        if (write_pid_file(config.pid_file) < 0) {
+            mqtt_log_error("Failed to create PID file");
+            mqtt_log_close();
+            return 1;
+        }
     }
 
     mqtt_log_info("%s version %s starting", PROGRAM_NAME, PROGRAM_VERSION);
@@ -307,6 +381,9 @@ int main(int argc, char *argv[])
     exit_code = daemon_loop(&config);
 
     /* Cleanup */
+    if (config.daemon_mode) {
+        remove_pid_file(config.pid_file);
+    }
     mqtt_log_close();
 
     return exit_code;

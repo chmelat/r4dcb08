@@ -18,7 +18,7 @@
 typedef struct {
     struct mosquitto *mosq;
     const MqttConfig *config;
-    int connected;
+    volatile int connected;  /* Accessed from callback thread */
     int reconnect_delay;
 } MqttClient;
 
