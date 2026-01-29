@@ -84,7 +84,6 @@ int maf_filter(char *sample, int nch, const float val[],
     int i, m;
     int center_idx;
     float sum;
-    int valid_count;
     float weight;
 
     /* Check if initialized */
@@ -127,82 +126,44 @@ int maf_filter(char *sample, int nch, const float val[],
 
     /* Process each channel */
     for (m = 0; m < nch; m++) {
-        /* Check for ERRRESP in current sample */
-        if (val[m] == ERRRESP) {
-            val_filtered[m] = ERRRESP;
-            continue;
-        }
+        float total_weight = 0.0f;
+        sum = 0.0f;
 
         /* If we don't have enough samples yet, use simple average */
         if (samples_count < window_size) {
-            sum = 0.0f;
-            valid_count = 0;
             for (i = 0; i < samples_count; i++) {
                 if (val_buffer[i][m] != ERRRESP) {
                     sum += val_buffer[i][m];
-                    valid_count++;
+                    total_weight += 1.0f;
                 }
             }
-            if (valid_count > 0) {
-                val_filtered[m] = sum / valid_count;
+            if (total_weight > 0.0f) {
+                val_filtered[m] = sum / total_weight;
             } else {
-                val_filtered[m] = val[m];
+                val_filtered[m] = ERRRESP;
             }
             continue;
         }
 
         /* Full window - apply trapezoidal weighted average */
-        sum = 0.0f;
-        valid_count = 0;
-
         for (i = 0; i < window_size; i++) {
             int idx = mod(buffer_index - window_size + 1 + i, window_size);
 
             if (val_buffer[idx][m] == ERRRESP) {
-                /* Skip ERRRESP values */
                 continue;
             }
 
             /* Trapezoidal weights: 0.5 at edges, 1.0 in the middle */
-            if (i == 0 || i == window_size - 1) {
-                weight = 0.5f;
-            } else {
-                weight = 1.0f;
-            }
+            weight = (i == 0 || i == window_size - 1) ? 0.5f : 1.0f;
 
             sum += weight * val_buffer[idx][m];
-            valid_count++;
+            total_weight += weight;
         }
 
-        if (valid_count == 0) {
-            /* No valid samples, pass through current value */
-            val_filtered[m] = val[m];
-        } else if (valid_count == window_size) {
-            /* All samples valid - use proper trapezoidal formula */
-            /* Total weight = 0.5 + (n-2)*1 + 0.5 = n-1 */
-            val_filtered[m] = sum / (window_size - 1);
-        } else {
-            /* Some ERRRESP values - use simple weighted average */
-            /* Recalculate with actual weights used */
-            float total_weight = 0.0f;
-            sum = 0.0f;
-            for (i = 0; i < window_size; i++) {
-                int idx = mod(buffer_index - window_size + 1 + i, window_size);
-
-                if (val_buffer[idx][m] == ERRRESP) {
-                    continue;
-                }
-
-                if (i == 0 || i == window_size - 1) {
-                    weight = 0.5f;
-                } else {
-                    weight = 1.0f;
-                }
-
-                sum += weight * val_buffer[idx][m];
-                total_weight += weight;
-            }
+        if (total_weight > 0.0f) {
             val_filtered[m] = sum / total_weight;
+        } else {
+            val_filtered[m] = ERRRESP;
         }
     }
 
