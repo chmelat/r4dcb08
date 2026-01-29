@@ -1,0 +1,28 @@
+[Unit]
+Description=R4DCB08 Temperature Sensor MQTT Publisher
+Documentation=https://github.com/example/r4dcb08
+After=network.target mosquitto.service
+Wants=mosquitto.service
+
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/r4dcb08-mqtt -c /etc/r4dcb08-mqtt.conf -d
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=10
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+
+# Allow access to serial devices
+DeviceAllow=/dev/ttyUSB* rw
+DeviceAllow=/dev/ttyAMA* rw
+DeviceAllow=/dev/serial* rw
+
+[Install]
+WantedBy=multi-user.target

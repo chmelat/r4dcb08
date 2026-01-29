@@ -1,0 +1,59 @@
+# R4DCB08 MQTT Daemon Configuration
+# Copy to /etc/r4dcb08-mqtt.conf and adjust values
+
+[serial]
+# Serial port device
+port = /dev/ttyUSB0
+
+# Modbus device address (1-254)
+address = 1
+
+# Serial port baudrate (9600 is default for R4DCB08)
+baudrate = 9600
+
+# Number of temperature channels to read (1-8)
+channels = 8
+
+[mqtt]
+# MQTT broker hostname or IP
+host = localhost
+
+# MQTT broker port
+mqtt_port = 1883
+
+# MQTT username (leave empty for anonymous)
+user =
+
+# MQTT password
+password =
+
+# Topic prefix for publishing
+# Temperatures will be published to: {topic}/{address}/temperature/ch1 ... chN
+topic = sensors/r4dcb08
+
+# MQTT client ID (leave empty for auto-generated)
+client_id =
+
+# Quality of Service (0, 1, or 2)
+qos = 1
+
+# Retain messages
+retain = true
+
+# Keepalive interval in seconds
+keepalive = 60
+
+[daemon]
+# Measurement interval in seconds
+interval = 10
+
+# Enable verbose logging
+verbose = false
+
+[filters]
+# Enable 3-point median filter for spike removal
+median_filter = false
+
+# Enable Moving Average Filter (MAF) with trapezoidal weights
+# Set window size (odd number 3-15) to enable, or 0 to disable
+maf_window = 0
