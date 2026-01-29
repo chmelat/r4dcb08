@@ -20,6 +20,7 @@
 #include "mqtt_error.h"
 #include "mqtt_client.h"
 #include "mqtt_publish.h"
+#include "mqtt_metrics.h"
 
 /* Program name for logging */
 #define PROGRAM_NAME "r4dcb08-mqtt"
@@ -174,10 +175,12 @@ static int daemon_loop(MqttConfig *config)
 {
     MqttClient client;
     TempContext temp_ctx;
+    MqttMetrics metrics;
     MqttStatus status;
     struct timespec ts;
     int consecutive_errors = 0;
     const int max_consecutive_errors = 10;
+    int diag_counter = 0;
 
     /* Initialize MQTT client library */
     status = mqtt_client_lib_init();
@@ -193,6 +196,9 @@ static int daemon_loop(MqttConfig *config)
         mqtt_client_lib_cleanup();
         return 1;
     }
+
+    /* Initialize metrics */
+    mqtt_metrics_init(&metrics);
 
     /* Open serial port */
     status = mqtt_temp_open(&temp_ctx);
@@ -247,20 +253,25 @@ static int daemon_loop(MqttConfig *config)
             status = mqtt_client_reconnect(&client);
             if (status != MQTT_OK) {
                 consecutive_errors++;
+                mqtt_metrics_set_consecutive_errors(&metrics, consecutive_errors);
                 if (consecutive_errors >= max_consecutive_errors) {
                     mqtt_log_error("Too many consecutive reconnect failures");
                     break;
                 }
                 continue;
             }
+            mqtt_metrics_reconnect(&metrics);
             consecutive_errors = 0;
+            mqtt_metrics_set_consecutive_errors(&metrics, 0);
             mqtt_publish_status(&client, "online");
         }
 
         /* Read and publish temperatures */
         status = mqtt_publish_temperatures(&temp_ctx, &client);
         if (status != MQTT_OK) {
+            mqtt_metrics_read_failure(&metrics);
             consecutive_errors++;
+            mqtt_metrics_set_consecutive_errors(&metrics, consecutive_errors);
             mqtt_log_warning("Temperature read/publish failed (%d/%d)",
                            consecutive_errors, max_consecutive_errors);
 
@@ -276,9 +287,20 @@ static int daemon_loop(MqttConfig *config)
                 mqtt_log_error("Failed to reopen serial port");
             }
         } else {
+            mqtt_metrics_read_success(&metrics);
             consecutive_errors = 0;
+            mqtt_metrics_set_consecutive_errors(&metrics, 0);
             /* Notify systemd watchdog on successful operation */
             sd_notify(0, "WATCHDOG=1");
+        }
+
+        /* Publish diagnostics every N intervals */
+        if (config->diagnostics_interval > 0) {
+            diag_counter++;
+            if (diag_counter >= config->diagnostics_interval) {
+                mqtt_publish_diagnostics(&client, &metrics);
+                diag_counter = 0;
+            }
         }
 
         /* Sleep for interval */

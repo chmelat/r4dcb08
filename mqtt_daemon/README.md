@@ -102,7 +102,8 @@ sudo make uninstall
 | `-d` | `--daemon` | Běžet jako daemon | ne |
 | `-v` | `--verbose` | Podrobný výstup | ne |
 | `-m` | `--median-filter` | Povolit median filtr | ne |
-| `-M` | `--maf-filter` | MAF filtr (velikost okna) | ne |
+| `-M` | `--maf-filter` | MAF filtr (velikost okna 3-15) | 5 (disabled) |
+| `-D` | `--diagnostics-interval` | Publikovat diagnostiku každých N intervalů | 6 (0=disabled) |
 | `-h` | `--help` | Zobrazit nápovědu | - |
 | `-V` | `--version` | Zobrazit verzi | - |
 
@@ -133,7 +134,11 @@ verbose = false
 
 [filters]
 median_filter = false
-maf_window = 0
+maf_filter = false
+maf_window = 5
+
+[diagnostics]
+diagnostics_interval = 6
 ```
 
 CLI parametry mají přednost před konfiguračním souborem.
@@ -149,6 +154,7 @@ Daemon publikuje na následující topics:
 {prefix}/{address}/temperature/ch8    Teplota kanálu 8 [°C]
 {prefix}/{address}/timestamp          Čas měření (ISO 8601)
 {prefix}/{address}/status             Stav: "online"/"offline"/"error"
+{prefix}/{address}/diagnostics        Diagnostické metriky (JSON)
 ```
 
 Příklad s výchozím nastavením (adresa 1):
@@ -157,6 +163,7 @@ sensors/r4dcb08/1/temperature/ch1     "23.5"
 sensors/r4dcb08/1/temperature/ch2     "24.1"
 sensors/r4dcb08/1/timestamp           "2026-01-29 17:54:32.45"
 sensors/r4dcb08/1/status              "online"
+sensors/r4dcb08/1/diagnostics         {"uptime":3600,"reads":{"total":360,"success":358,"failure":2},"mqtt_reconnects":1,"consecutive_errors":0}
 ```
 
 ### Last Will and Testament (LWT)
@@ -206,6 +213,47 @@ sudo systemctl restart r4dcb08-mqtt
 ```bash
 sudo systemctl stop r4dcb08-mqtt
 ```
+
+## Diagnostika
+
+Daemon může publikovat diagnostické metriky každých N intervalů (výchozí: 6, tj. každou minutu při 10s intervalu).
+
+### Konfigurace
+
+```bash
+# Diagnostika každých 10 intervalů
+./r4dcb08-mqtt -p /dev/ttyUSB0 -H localhost -D 10
+
+# Vypnout diagnostiku
+./r4dcb08-mqtt -p /dev/ttyUSB0 -H localhost -D 0
+```
+
+### Formát
+
+Topic: `{prefix}/{address}/diagnostics`
+
+Payload (JSON, bez retain):
+```json
+{
+  "uptime": 3600,
+  "reads": {
+    "total": 360,
+    "success": 358,
+    "failure": 2
+  },
+  "mqtt_reconnects": 1,
+  "consecutive_errors": 0
+}
+```
+
+| Pole | Typ | Popis |
+|------|-----|-------|
+| `uptime` | uint32 | Sekund od startu daemona |
+| `reads.total` | uint32 | Celkový počet pokusů o čtení |
+| `reads.success` | uint32 | Úspěšná čtení |
+| `reads.failure` | uint32 | Neúspěšná čtení |
+| `mqtt_reconnects` | uint32 | Počet MQTT rekonektů |
+| `consecutive_errors` | int | Aktuální počet po sobě jdoucích chyb |
 
 ## Filtry
 
@@ -295,7 +343,7 @@ Po 10 po sobě jdoucích chybách daemon ukončí činnost.
 ├─────────────────────────────────────────────────────┤
 │  mqtt_main.c      │  mqtt_client.c (libmosquitto)   │
 │  mqtt_config.c    │  mqtt_publish.c                 │
-│  mqtt_error.c     │                                 │
+│  mqtt_error.c     │  mqtt_metrics.c                 │
 ├─────────────────────────────────────────────────────┤
 │  Znovupoužité moduly z r4dcb08:                     │
 │  serial.c  packet.c  monada.c  now.c                │
@@ -312,6 +360,7 @@ Po 10 po sobě jdoucích chybách daemon ukončí činnost.
 | `mqtt_error.c/h` | Logování (syslog/stderr), chybové kódy |
 | `mqtt_client.c/h` | Wrapper pro libmosquitto |
 | `mqtt_publish.c/h` | Čtení teplot a publikování |
+| `mqtt_metrics.c/h` | Diagnostické metriky |
 
 ## Omezení
 

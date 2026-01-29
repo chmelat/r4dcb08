@@ -6,7 +6,7 @@ PROGRAM = r4dcb08-mqtt
 VERSION = 1.0
 
 # Source files
-MQTT_SRC = mqtt_main.c mqtt_config.c mqtt_error.c mqtt_client.c mqtt_publish.c
+MQTT_SRC = mqtt_main.c mqtt_config.c mqtt_error.c mqtt_client.c mqtt_publish.c mqtt_metrics.c
 
 # Reused modules from parent directory
 SHARED_SRC = ../serial.c ../packet.c ../monada.c ../now.c \

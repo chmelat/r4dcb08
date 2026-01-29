@@ -235,3 +235,25 @@ MqttStatus mqtt_publish_status(MqttClient *client, const char *status)
     return mqtt_client_publish(client, "status", status,
                               client->config->qos, 1);  /* Always retain status */
 }
+
+MqttStatus mqtt_publish_diagnostics(MqttClient *client, const MqttMetrics *metrics)
+{
+    char payload[256];
+
+    if (client == NULL || metrics == NULL) {
+        return MQTT_ERR_PUBLISH;
+    }
+
+    snprintf(payload, sizeof(payload),
+             "{\"uptime\":%u,"
+             "\"reads\":{\"total\":%u,\"success\":%u,\"failure\":%u},"
+             "\"mqtt_reconnects\":%u,"
+             "\"consecutive_errors\":%d}",
+             mqtt_metrics_uptime(metrics),
+             metrics->read_total, metrics->read_success, metrics->read_failure,
+             metrics->mqtt_reconnect_count, metrics->consecutive_errors);
+
+    /* Diagnostics without retain flag - current state only */
+    return mqtt_client_publish(client, "diagnostics", payload,
+                              client->config->qos, 0);
+}

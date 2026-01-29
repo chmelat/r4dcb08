@@ -20,6 +20,7 @@
 #define MQTT_DEFAULT_INTERVAL 10
 #define MQTT_DEFAULT_QOS 1
 #define MQTT_DEFAULT_KEEPALIVE 60
+#define MQTT_DEFAULT_DIAGNOSTICS_INTERVAL 6
 
 /* Environment variable for password */
 #define MQTT_PASSWORD_ENV "MQTT_PASSWORD"
@@ -71,6 +72,9 @@ typedef struct {
 
     /* Password file (more secure than command line) */
     char password_file[MQTT_MAX_PATH];
+
+    /* Diagnostics settings */
+    int diagnostics_interval;  /* Publish diagnostics every N intervals (0=disable) */
 } MqttConfig;
 
 /**

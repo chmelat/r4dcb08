@@ -37,6 +37,7 @@ static struct option long_options[] = {
     {"tls-cert",      required_argument, 0, 1002},
     {"tls-key",       required_argument, 0, 1003},
     {"tls-insecure",  no_argument,       0, 1004},
+    {"diagnostics-interval", required_argument, 0, 'D'},
     {"help",          no_argument,       0, 'h'},
     {"version",       no_argument,       0, 'V'},
     {0, 0, 0, 0}
@@ -121,6 +122,9 @@ void mqtt_config_init(MqttConfig *config)
 
     /* Default PID file */
     strncpy(config->pid_file, "/var/run/r4dcb08-mqtt.pid", MQTT_MAX_PATH - 1);
+
+    /* Diagnostics defaults */
+    config->diagnostics_interval = MQTT_DEFAULT_DIAGNOSTICS_INTERVAL;
 }
 
 static char *trim(char *str)
@@ -266,6 +270,10 @@ MqttStatus mqtt_config_parse_file(const char *filename, MqttConfig *config)
             }
         } else if (strcmp(key, "verbose") == 0) {
             config->verbose = PARSE_BOOL(value);
+        } else if (strcmp(key, "diagnostics_interval") == 0) {
+            if (mqtt_config_parse_int(value, &config->diagnostics_interval, 0, 1000) != 0) {
+                mqtt_log_warning("Config line %d: invalid diagnostics_interval '%s'", line_num, value);
+            }
         /* TLS options */
         } else if (strcmp(key, "tls") == 0 || strcmp(key, "use_tls") == 0) {
             config->use_tls = PARSE_BOOL(value);
@@ -299,7 +307,7 @@ MqttStatus mqtt_config_parse_args(int argc, char *argv[], MqttConfig *config)
         return MQTT_ERR_CONFIG_VALUE;
     }
 
-    while ((opt = getopt_long(argc, argv, "p:a:b:n:H:P:u:W:t:i:I:c:F:dvmM:ShV",
+    while ((opt = getopt_long(argc, argv, "p:a:b:n:H:P:u:W:t:i:I:c:F:dvmM:D:ShV",
                               long_options, &option_index)) != -1) {
         switch (opt) {
             case 'p':
@@ -371,6 +379,12 @@ MqttStatus mqtt_config_parse_args(int argc, char *argv[], MqttConfig *config)
                 config->enable_maf_filter = 1;
                 if (mqtt_config_parse_int(optarg, &config->maf_window_size, 3, 15) != 0) {
                     fprintf(stderr, "Error: invalid MAF window size '%s'\n", optarg);
+                    return MQTT_ERR_CONFIG_VALUE;
+                }
+                break;
+            case 'D':
+                if (mqtt_config_parse_int(optarg, &config->diagnostics_interval, 0, 1000) != 0) {
+                    fprintf(stderr, "Error: invalid diagnostics interval '%s'\n", optarg);
                     return MQTT_ERR_CONFIG_VALUE;
                 }
                 break;
@@ -530,6 +544,11 @@ void mqtt_config_print(const MqttConfig *config)
     if (config->enable_maf_filter) {
         mqtt_log_info("  MAF filter: enabled (window=%d)", config->maf_window_size);
     }
+    if (config->diagnostics_interval > 0) {
+        mqtt_log_info("  Diagnostics: every %d intervals", config->diagnostics_interval);
+    } else {
+        mqtt_log_info("  Diagnostics: disabled");
+    }
 }
 
 void mqtt_config_usage(const char *program_name)
@@ -564,6 +583,9 @@ void mqtt_config_usage(const char *program_name)
     printf("\nFilter options:\n");
     printf("  -m, --median-filter      Enable median filter\n");
     printf("  -M, --maf-filter <size>  Enable MAF filter with window size (odd, 3-15)\n");
+    printf("\nDiagnostics options:\n");
+    printf("  -D, --diagnostics-interval <N>  Publish diagnostics every N intervals (default: %d, 0=disable)\n",
+           MQTT_DEFAULT_DIAGNOSTICS_INTERVAL);
     printf("\nOther options:\n");
     printf("  -h, --help               Show this help\n");
     printf("  -V, --version            Show version\n");

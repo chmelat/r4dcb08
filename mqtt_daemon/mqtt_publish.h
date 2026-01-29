@@ -8,6 +8,7 @@
 #include "mqtt_client.h"
 #include "mqtt_config.h"
 #include "mqtt_error.h"
+#include "mqtt_metrics.h"
 
 /* Maximum payload size */
 #define MQTT_MAX_PAYLOAD 64
@@ -66,5 +67,17 @@ MqttStatus mqtt_publish_temperatures(TempContext *ctx, MqttClient *client);
  * @return MQTT_OK on success, error code on failure
  */
 MqttStatus mqtt_publish_status(MqttClient *client, const char *status);
+
+/**
+ * Publish diagnostic metrics
+ *
+ * Publishes JSON payload to {prefix}/{address}/diagnostics:
+ * {"uptime":N,"reads":{"total":N,"success":N,"failure":N},"mqtt_reconnects":N,"consecutive_errors":N}
+ *
+ * @param client Pointer to MQTT client
+ * @param metrics Pointer to metrics structure
+ * @return MQTT_OK on success, error code on failure
+ */
+MqttStatus mqtt_publish_diagnostics(MqttClient *client, const MqttMetrics *metrics);
 
 #endif /* MQTT_PUBLISH_H */
