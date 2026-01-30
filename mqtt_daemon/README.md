@@ -67,7 +67,6 @@ pkg install mosquitto
 cd mqtt_daemon
 make                  # with systemd support (default)
 make NO_SYSTEMD=1     # without systemd (Alpine, FreeBSD, etc.)
-make DBG=-g OPT=-O0   # debug build
 ```
 
 ## Install
@@ -76,7 +75,18 @@ make DBG=-g OPT=-O0   # debug build
 sudo make install
 ```
 
-Installs binary to `/usr/local/bin/`, config to `/etc/`, systemd unit to `/etc/systemd/system/`.
+Installs:
+- Binary to `/usr/local/bin/`
+- Config to `/etc/r4dcb08-mqtt.conf`
+- Systemd unit to `/usr/local/lib/systemd/system/`
+
+After install, create service user and start:
+
+```bash
+sudo useradd -r -s /usr/sbin/nologin -G dialout r4dcb08
+sudo chown r4dcb08:r4dcb08 /etc/r4dcb08-mqtt.conf
+sudo systemctl enable --now r4dcb08-mqtt
+```
 
 ## CLI Options
 
@@ -236,7 +246,7 @@ sudo systemctl status r4dcb08-mqtt
 sudo journalctl -u r4dcb08-mqtt -f
 ```
 
-Security features: runs as `nobody`, read-only filesystem, access only to serial ports.
+Security features: runs as dedicated `r4dcb08` user, read-only filesystem, access only to serial ports.
 
 ## Running Without Systemd
 

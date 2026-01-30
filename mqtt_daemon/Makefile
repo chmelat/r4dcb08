@@ -3,122 +3,118 @@
 #
 
 PROGRAM = r4dcb08-mqtt
-VERSION = 1.0
 
 # Source files
 MQTT_SRC = mqtt_main.c mqtt_config.c mqtt_error.c mqtt_client.c mqtt_publish.c mqtt_metrics.c
 
-# Reused modules from parent directory
-SHARED_SRC = ../serial.c ../packet.c ../monada.c ../now.c \
-             ../median_filter.c ../maf_filter.c ../error.c
-
 # Object files
 MQTT_OBJ = $(MQTT_SRC:.c=.o)
 SHARED_OBJ = serial.o packet.o monada.o now.o median_filter.o maf_filter.o error.o
-
-# All objects
 OBJ = $(MQTT_OBJ) $(SHARED_OBJ)
 
-# C compiler
-CC = clang
-
-# Compiler optimization
-OPT = -O2
-
-# Debug flags (use -g for debugging, remove OPT=-O2)
-DBG =
-
-# Compiler flags
+# Compiler
+CC ?= clang
 CFLAGS = -Wall -Wextra -I..
-
-# Libraries
+OPT = -O2
 LIBS = -lmosquitto
 
-# Systemd support enabled by default (use: make NO_SYSTEMD=1 to disable)
+# Systemd support (use: make NO_SYSTEMD=1 to disable)
 ifndef NO_SYSTEMD
 CFLAGS += -DUSE_SYSTEMD
 LIBS += -lsystemd
 endif
 
 # Installation paths
-PREFIX = /usr/local
-BINDIR = $(PREFIX)/bin
-SYSCONFDIR = /etc
-SYSTEMDDIR = /etc/systemd/system
+BINDIR = /usr/local/bin
+CONFDIR = /etc
+SYSTEMDDIR = /usr/local/lib/systemd/system
 
-# Phony targets
-.PHONY: all clean install uninstall
+.PHONY: all clean install uninstall help
 
-# Default target
 all: $(PROGRAM)
 
-# Link
 $(PROGRAM): $(OBJ)
-	$(CC) $(OBJ) $(DBG) $(LIBS) -o $(PROGRAM)
+	$(CC) $(OBJ) $(LIBS) -o $(PROGRAM)
 
-# Compile MQTT daemon sources
-%.o: %.c
-	$(CC) $(CFLAGS) $(OPT) $(DBG) -c $< -o $@
+# MQTT daemon sources
+mqtt_main.o: mqtt_main.c
+	$(CC) $(CFLAGS) $(OPT) -c $< -o $@
 
-# Compile shared modules from parent directory
+mqtt_config.o: mqtt_config.c
+	$(CC) $(CFLAGS) $(OPT) -c $< -o $@
+
+mqtt_error.o: mqtt_error.c
+	$(CC) $(CFLAGS) $(OPT) -c $< -o $@
+
+mqtt_client.o: mqtt_client.c
+	$(CC) $(CFLAGS) $(OPT) -c $< -o $@
+
+mqtt_publish.o: mqtt_publish.c
+	$(CC) $(CFLAGS) $(OPT) -c $< -o $@
+
+mqtt_metrics.o: mqtt_metrics.c
+	$(CC) $(CFLAGS) $(OPT) -c $< -o $@
+
+# Shared modules from parent directory
 serial.o: ../serial.c
-	$(CC) $(CFLAGS) $(OPT) $(DBG) -c $< -o $@
+	$(CC) $(CFLAGS) $(OPT) -c $< -o $@
 
 packet.o: ../packet.c
-	$(CC) $(CFLAGS) $(OPT) $(DBG) -c $< -o $@
+	$(CC) $(CFLAGS) $(OPT) -c $< -o $@
 
 monada.o: ../monada.c
-	$(CC) $(CFLAGS) $(OPT) $(DBG) -c $< -o $@
+	$(CC) $(CFLAGS) $(OPT) -c $< -o $@
 
 now.o: ../now.c
-	$(CC) $(CFLAGS) $(OPT) $(DBG) -c $< -o $@
+	$(CC) $(CFLAGS) $(OPT) -c $< -o $@
 
 median_filter.o: ../median_filter.c
-	$(CC) $(CFLAGS) $(OPT) $(DBG) -c $< -o $@
+	$(CC) $(CFLAGS) $(OPT) -c $< -o $@
 
 maf_filter.o: ../maf_filter.c
-	$(CC) $(CFLAGS) $(OPT) $(DBG) -c $< -o $@
+	$(CC) $(CFLAGS) $(OPT) -c $< -o $@
 
 error.o: ../error.c
-	$(CC) $(CFLAGS) $(OPT) $(DBG) -c $< -o $@
+	$(CC) $(CFLAGS) $(OPT) -c $< -o $@
 
-# Install
+# Install (requires root)
 install: $(PROGRAM)
-	install -d $(DESTDIR)$(BINDIR)
-	install -m 755 $(PROGRAM) $(DESTDIR)$(BINDIR)/
-	install -d $(DESTDIR)$(SYSCONFDIR)
-	@if [ ! -f $(DESTDIR)$(SYSCONFDIR)/r4dcb08-mqtt.conf ]; then \
-		install -m 644 ../r4dcb08-mqtt.conf.example $(DESTDIR)$(SYSCONFDIR)/r4dcb08-mqtt.conf; \
-		echo "Installed default config to $(SYSCONFDIR)/r4dcb08-mqtt.conf"; \
+	install -d $(BINDIR)
+	install -m 755 $(PROGRAM) $(BINDIR)/
+	@if [ ! -f $(CONFDIR)/r4dcb08-mqtt.conf ]; then \
+		install -m 640 r4dcb08-mqtt.conf.example $(CONFDIR)/r4dcb08-mqtt.conf; \
+		echo "Installed config to $(CONFDIR)/r4dcb08-mqtt.conf"; \
 	else \
-		echo "Config file exists, not overwriting"; \
+		echo "Config exists, not overwriting"; \
 	fi
-	install -d $(DESTDIR)$(SYSTEMDDIR)
-	install -m 644 r4dcb08-mqtt.service $(DESTDIR)$(SYSTEMDDIR)/
+	install -d $(SYSTEMDDIR)
+	install -m 644 r4dcb08-mqtt.service $(SYSTEMDDIR)/
+	systemctl daemon-reload
 	@echo ""
-	@echo "Installation complete. To enable the service:"
-	@echo "  sudo systemctl daemon-reload"
-	@echo "  sudo systemctl enable r4dcb08-mqtt"
-	@echo "  sudo systemctl start r4dcb08-mqtt"
+	@echo "Done. Before starting the service:"
+	@echo "  1. Create user: sudo useradd -r -s /usr/sbin/nologin -G dialout r4dcb08"
+	@echo "  2. Fix config owner: sudo chown r4dcb08:r4dcb08 $(CONFDIR)/r4dcb08-mqtt.conf"
+	@echo "  3. Enable service: sudo systemctl enable --now r4dcb08-mqtt"
 
-# Uninstall
+# Uninstall (requires root)
 uninstall:
-	rm -f $(DESTDIR)$(BINDIR)/$(PROGRAM)
-	rm -f $(DESTDIR)$(SYSTEMDDIR)/r4dcb08-mqtt.service
-	@echo "Note: Config file $(SYSCONFDIR)/r4dcb08-mqtt.conf not removed"
+	@if systemctl is-active --quiet r4dcb08-mqtt 2>/dev/null; then \
+		systemctl stop r4dcb08-mqtt; \
+	fi
+	@if systemctl is-enabled --quiet r4dcb08-mqtt 2>/dev/null; then \
+		systemctl disable r4dcb08-mqtt; \
+	fi
+	rm -f $(SYSTEMDDIR)/r4dcb08-mqtt.service
+	rm -f $(BINDIR)/$(PROGRAM)
+	systemctl daemon-reload
+	@echo "Uninstalled. Config $(CONFDIR)/r4dcb08-mqtt.conf kept."
 
-# Clean
 clean:
 	rm -f *.o $(PROGRAM)
 
-# Show help
 help:
-	@echo "r4dcb08-mqtt Makefile targets:"
-	@echo "  all       - Build the daemon (default)"
-	@echo "  clean     - Remove build artifacts"
-	@echo "  install   - Install to system (requires root)"
-	@echo "  uninstall - Remove from system (requires root)"
-	@echo ""
-	@echo "Variables:"
-	@echo "  PREFIX=$(PREFIX)"
-	@echo "  DESTDIR=$(DESTDIR)"
+	@echo "Targets:"
+	@echo "  make          - Build daemon"
+	@echo "  make install  - Install (requires root)"
+	@echo "  make uninstall- Uninstall (requires root)"
+	@echo "  make clean    - Remove build files"
