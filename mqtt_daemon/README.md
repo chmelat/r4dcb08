@@ -162,19 +162,21 @@ mqtt_port = 1883
 user =
 password_file =
 topic = sensors/r4dcb08
+client_id =
 qos = 1
 retain = true
 keepalive = 60
 
 [tls]
-enabled = false
-ca_file =
-cert_file =
-key_file =
-insecure = false
+tls = false
+tls_ca =
+tls_cert =
+tls_key =
+tls_insecure = false
 
 [daemon]
 interval = 10
+pid_file = /var/run/r4dcb08-mqtt.pid
 verbose = false
 
 [filters]
