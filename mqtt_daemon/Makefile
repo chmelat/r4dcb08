@@ -32,7 +32,13 @@ DBG =
 CFLAGS = -Wall -Wextra -I..
 
 # Libraries
-LIBS = -lmosquitto -lsystemd
+LIBS = -lmosquitto
+
+# Systemd support enabled by default (use: make NO_SYSTEMD=1 to disable)
+ifndef NO_SYSTEMD
+CFLAGS += -DUSE_SYSTEMD
+LIBS += -lsystemd
+endif
 
 # Installation paths
 PREFIX = /usr/local

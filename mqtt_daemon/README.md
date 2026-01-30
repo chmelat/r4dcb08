@@ -1,115 +1,143 @@
 # r4dcb08-mqtt
 
-MQTT daemon pro publikování teplot z R4DCB08 teplotních senzorů.
+MQTT daemon for publishing temperatures from R4DCB08 temperature sensors.
 
-## Popis
+## Quick Start
 
-`r4dcb08-mqtt` je daemon, který periodicky čte teploty z R4DCB08 teplotních senzorů přes Modbus RTU (RS485) a publikuje je na MQTT broker. Podporuje až 8 teplotních kanálů, filtrování hodnot a běh jako systemd služba.
+```bash
+# Build
+cd mqtt_daemon
+make
 
-## Funkce
+# Run (reads 8 channels, publishes to localhost every 10s)
+./r4dcb08-mqtt -p /dev/ttyUSB0 -H localhost -v
 
-- Čtení teplot z 1-8 kanálů R4DCB08 senzoru
-- Publikování na MQTT broker s QoS 0/1/2 a retain
-- Last Will and Testament (LWT) pro detekci offline stavu
-- Automatické znovupřipojení s exponenciálním backoff
-- Median filtr pro odstranění špiček
-- MAF (Moving Average Filter) s lichoběžníkovými váhami
-- Konfigurace přes CLI nebo INI soubor
-- Běh jako daemon nebo v popředí
-- Logování do syslog nebo stderr
-- Systemd integrace
+# Subscribe to see values
+mosquitto_sub -h localhost -t "sensors/r4dcb08/#" -v
+```
 
-## Závislosti
+## Description
+
+`r4dcb08-mqtt` reads temperatures from R4DCB08 sensors via Modbus RTU (RS485) and publishes them to an MQTT broker. Supports up to 8 channels, filtering, TLS, and runs as a systemd service or standalone daemon.
+
+## Hardware Requirements
+
+- **R4DCB08 sensor module** - 8-channel temperature sensor with RS485 interface
+- **RS485-USB converter** - e.g. CH340-based or FTDI-based adapter
+- Wiring: Connect A+/B- from sensor to A+/B- on converter (match polarity)
+
+Typical USB device: `/dev/ttyUSB0` (Linux), `/dev/cuaU0` (FreeBSD)
+
+## Features
+
+- Read temperatures from 1-8 channels
+- Publish to MQTT with QoS 0/1/2 and retain
+- TLS/SSL encryption support
+- Last Will and Testament (LWT) - broker publishes "offline" when daemon dies unexpectedly
+- Auto reconnect with exponential backoff (1-60s)
+- Median filter (3-point) for spike removal
+- MAF filter (moving average, 3-15 samples)
+- Config via CLI or INI file
+- Optional systemd integration (notify, watchdog)
+
+## Dependencies
 
 ```bash
 # Debian/Ubuntu
-sudo apt-get install libmosquitto-dev
-
-# Arch Linux
-sudo pacman -S mosquitto
+sudo apt-get install libmosquitto-dev libsystemd-dev
 
 # Fedora/RHEL
-sudo dnf install mosquitto-devel
+sudo dnf install mosquitto-devel systemd-devel
+
+# Arch Linux
+sudo pacman -S mosquitto libsystemd
+
+# Alpine Linux (no systemd)
+apk add mosquitto-dev
+
+# FreeBSD
+pkg install mosquitto
 ```
 
-## Kompilace
+`libsystemd-dev` is only needed for default build. Use `make NO_SYSTEMD=1` to build without it.
+
+## Build
 
 ```bash
 cd mqtt_daemon
-make
+make                  # with systemd support (default)
+make NO_SYSTEMD=1     # without systemd (Alpine, FreeBSD, etc.)
+make DBG=-g OPT=-O0   # debug build
 ```
 
-Pro debug verzi:
-```bash
-make clean
-make DBG=-g OPT=-O0
-```
-
-## Instalace
+## Install
 
 ```bash
 sudo make install
 ```
 
-Toto nainstaluje:
-- `/usr/local/bin/r4dcb08-mqtt` - binární soubor
-- `/etc/r4dcb08-mqtt.conf` - konfigurační soubor (pokud neexistuje)
-- `/etc/systemd/system/r4dcb08-mqtt.service` - systemd unit
+Installs binary to `/usr/local/bin/`, config to `/etc/`, systemd unit to `/etc/systemd/system/`.
 
-## Odinstalace
+## CLI Options
 
-```bash
-sudo make uninstall
-```
+### Serial
 
-## Použití
+| Option | Long | Description | Default |
+|--------|------|-------------|---------|
+| `-p` | `--port` | Serial port | `/dev/ttyUSB0` |
+| `-a` | `--address` | Modbus address (1-254) | `1` |
+| `-b` | `--baudrate` | Baud rate | `9600` |
+| `-n` | `--channels` | Number of channels (1-8) | `8` |
 
-### Příkazová řádka
+### MQTT
 
-```bash
-# Základní použití
-./r4dcb08-mqtt -p /dev/ttyUSB0 -a 1 -H localhost
+| Option | Long | Description | Default |
+|--------|------|-------------|---------|
+| `-H` | `--mqtt-host` | Broker hostname | `localhost` |
+| `-P` | `--mqtt-port` | Broker port | `1883` (TLS: `8883`) |
+| `-u` | `--mqtt-user` | Username | - |
+| `-W` | `--password-file` | File containing password | - |
+| `-t` | `--topic` | Topic prefix | `sensors/r4dcb08` |
+| `-i` | `--client-id` | Client ID | auto-generated |
 
-# S verbose výstupem
-./r4dcb08-mqtt -p /dev/ttyUSB0 -a 1 -H localhost -v
+Password can also be set via `MQTT_PASSWORD` environment variable.
 
-# Jako daemon
-./r4dcb08-mqtt -p /dev/ttyUSB0 -a 1 -H localhost -d
+### TLS
 
-# S konfiguračním souborem
-./r4dcb08-mqtt -c /etc/r4dcb08-mqtt.conf
+| Option | Long | Description |
+|--------|------|-------------|
+| `-S` | `--tls` | Enable TLS |
+| | `--tls-ca` | CA certificate file |
+| | `--tls-cert` | Client certificate |
+| | `--tls-key` | Client private key |
+| | `--tls-insecure` | Skip cert verification (testing only) |
 
-# S filtry
-./r4dcb08-mqtt -p /dev/ttyUSB0 -a 1 -H localhost -m -M 5
-```
+### Daemon
 
-### CLI parametry
+| Option | Long | Description | Default |
+|--------|------|-------------|---------|
+| `-I` | `--interval` | Measurement interval [s] | `10` |
+| `-c` | `--config` | Config file path | - |
+| `-F` | `--pid-file` | PID file path | `/var/run/r4dcb08-mqtt.pid` |
+| `-d` | `--daemon` | Run as background daemon | no |
+| `-v` | `--verbose` | Verbose output | no |
 
-| Parametr | Dlouhý tvar | Popis | Výchozí |
-|----------|-------------|-------|---------|
-| `-p` | `--port` | Sériový port | `/dev/ttyUSB0` |
-| `-a` | `--address` | Modbus adresa (1-254) | `1` |
-| `-b` | `--baudrate` | Přenosová rychlost | `9600` |
-| `-n` | `--channels` | Počet kanálů (1-8) | `8` |
-| `-H` | `--mqtt-host` | MQTT broker hostname | `localhost` |
-| `-P` | `--mqtt-port` | MQTT broker port | `1883` |
-| `-u` | `--mqtt-user` | MQTT uživatel | - |
-| `-w` | `--mqtt-pass` | MQTT heslo | - |
-| `-t` | `--topic` | Prefix MQTT topic | `sensors/r4dcb08` |
-| `-i` | `--client-id` | MQTT client ID | auto |
-| `-I` | `--interval` | Interval měření [s] | `10` |
-| `-c` | `--config` | Konfigurační soubor | - |
-| `-d` | `--daemon` | Běžet jako daemon | ne |
-| `-v` | `--verbose` | Podrobný výstup | ne |
-| `-m` | `--median-filter` | Povolit median filtr | ne |
-| `-M` | `--maf-filter` | MAF filtr (velikost okna 3-15) | 5 (disabled) |
-| `-D` | `--diagnostics-interval` | Publikovat diagnostiku každých N intervalů | 6 (0=disabled) |
-| `-h` | `--help` | Zobrazit nápovědu | - |
-| `-V` | `--version` | Zobrazit verzi | - |
+### Filters
 
-### Konfigurační soubor
+| Option | Long | Description | Default |
+|--------|------|-------------|---------|
+| `-m` | `--median-filter` | Enable 3-point median filter | off |
+| `-M` | `--maf-filter` | Enable MAF with window size (odd, 3-15) | off |
 
-Konfigurační soubor používá INI formát. Příklad (`/etc/r4dcb08-mqtt.conf`):
+### Diagnostics
+
+| Option | Long | Description | Default |
+|--------|------|-------------|---------|
+| `-D` | `--diagnostics-interval` | Publish every N intervals (0=disable) | `6` |
+
+## Config File
+
+INI format, CLI options override config values.
 
 ```ini
 [serial]
@@ -122,11 +150,18 @@ channels = 8
 host = localhost
 mqtt_port = 1883
 user =
-password =
+password_file =
 topic = sensors/r4dcb08
 qos = 1
 retain = true
 keepalive = 60
+
+[tls]
+enabled = false
+ca_file =
+cert_file =
+key_file =
+insecure = false
 
 [daemon]
 interval = 10
@@ -141,238 +176,198 @@ maf_window = 5
 diagnostics_interval = 6
 ```
 
-CLI parametry mají přednost před konfiguračním souborem.
-
 ## MQTT Topics
 
-Daemon publikuje na následující topics:
-
 ```
-{prefix}/{address}/temperature/ch1    Teplota kanálu 1 [°C]
-{prefix}/{address}/temperature/ch2    Teplota kanálu 2 [°C]
+{prefix}/{address}/temperature/ch1    Channel 1 temperature [°C]
+{prefix}/{address}/temperature/ch2    Channel 2 temperature [°C]
 ...
-{prefix}/{address}/temperature/ch8    Teplota kanálu 8 [°C]
-{prefix}/{address}/timestamp          Čas měření (ISO 8601)
-{prefix}/{address}/status             Stav: "online"/"offline"/"error"
-{prefix}/{address}/diagnostics        Diagnostické metriky (JSON)
+{prefix}/{address}/status             "online" / "offline"
+{prefix}/{address}/timestamp          Measurement time
+{prefix}/{address}/diagnostics        JSON metrics
 ```
 
-Příklad s výchozím nastavením (adresa 1):
+Example output:
 ```
 sensors/r4dcb08/1/temperature/ch1     "23.5"
-sensors/r4dcb08/1/temperature/ch2     "24.1"
-sensors/r4dcb08/1/timestamp           "2026-01-29 17:54:32.45"
 sensors/r4dcb08/1/status              "online"
-sensors/r4dcb08/1/diagnostics         {"uptime":3600,"reads":{"total":360,"success":358,"failure":2},"mqtt_reconnects":1,"consecutive_errors":0}
+sensors/r4dcb08/1/timestamp           "2026-01-29 17:54:32.45"
 ```
+
+### Values
+
+- Temperatures: one decimal place as string (`"23.5"`)
+- Invalid readings: `"NaN"`
+- All messages: `retain=true` by default, QoS 1
 
 ### Last Will and Testament (LWT)
 
-Při neočekávaném odpojení daemon automaticky publikuje:
-```
-sensors/r4dcb08/1/status              "offline"
-```
+When daemon disconnects unexpectedly (crash, network failure), the MQTT broker automatically publishes `"offline"` to the status topic. This lets subscribers detect sensor failures even when the daemon can't send a goodbye message.
 
-### Hodnoty
+## Filters
 
-- Teploty jsou publikovány jako text s jedním desetinným místem (např. `"23.5"`)
-- Neplatné hodnoty jsou publikovány jako `"NaN"`
-- Všechny zprávy jsou s `retain=true` (lze změnit v konfiguraci)
-- Výchozí QoS je 1
+### Median filter (`-m`)
+
+Removes random spikes by keeping last 3 values and returning the middle one. Good for noisy sensors.
+
+### MAF filter (`-M <size>`)
+
+Moving Average Filter smooths readings over a window of 3-15 samples. Edge samples have half weight to reduce lag. Larger window = smoother but slower response.
+
+```bash
+# Median only - removes spikes
+./r4dcb08-mqtt -H localhost -m
+
+# MAF with 7-sample window - smooth output
+./r4dcb08-mqtt -H localhost -M 7
+
+# Both - spike removal + smoothing
+./r4dcb08-mqtt -H localhost -m -M 7
+```
 
 ## Systemd
 
-### Spuštění služby
+Service uses notify protocol with watchdog:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable r4dcb08-mqtt
-sudo systemctl start r4dcb08-mqtt
-```
-
-### Stav služby
-
-```bash
+sudo systemctl enable --now r4dcb08-mqtt
 sudo systemctl status r4dcb08-mqtt
-```
-
-### Logy
-
-```bash
 sudo journalctl -u r4dcb08-mqtt -f
 ```
 
-### Restart
+Security features: runs as `nobody`, read-only filesystem, access only to serial ports.
+
+## Running Without Systemd
+
+Build with `make NO_SYSTEMD=1`, then use one of these:
+
+### OpenRC (Alpine, Gentoo)
 
 ```bash
-sudo systemctl restart r4dcb08-mqtt
+cat > /etc/init.d/r4dcb08-mqtt << 'EOF'
+#!/sbin/openrc-run
+name="r4dcb08-mqtt"
+command="/usr/local/bin/r4dcb08-mqtt"
+command_args="-c /etc/r4dcb08-mqtt.conf"
+command_background=true
+pidfile="/run/${RC_SVCNAME}.pid"
+command_user="nobody:dialout"
+depend() { need net; after mosquitto; }
+EOF
+chmod +x /etc/init.d/r4dcb08-mqtt
+rc-update add r4dcb08-mqtt default
 ```
 
-### Zastavení
+### runit (Void, Devuan)
 
 ```bash
-sudo systemctl stop r4dcb08-mqtt
+mkdir -p /etc/sv/r4dcb08-mqtt
+cat > /etc/sv/r4dcb08-mqtt/run << 'EOF'
+#!/bin/sh
+exec chpst -u nobody:dialout /usr/local/bin/r4dcb08-mqtt -c /etc/r4dcb08-mqtt.conf 2>&1
+EOF
+chmod +x /etc/sv/r4dcb08-mqtt/run
+ln -s /etc/sv/r4dcb08-mqtt /var/service/
 ```
 
-## Diagnostika
+### supervisord
 
-Daemon může publikovat diagnostické metriky každých N intervalů (výchozí: 6, tj. každou minutu při 10s intervalu).
+```ini
+[program:r4dcb08-mqtt]
+command=/usr/local/bin/r4dcb08-mqtt -c /etc/r4dcb08-mqtt.conf
+user=nobody
+group=dialout
+autorestart=true
+stderr_logfile=/var/log/r4dcb08-mqtt.err.log
+```
 
-### Konfigurace
+### Manual
 
 ```bash
-# Diagnostika každých 10 intervalů
-./r4dcb08-mqtt -p /dev/ttyUSB0 -H localhost -D 10
+# Foreground
+./r4dcb08-mqtt -c /etc/r4dcb08-mqtt.conf -v
 
-# Vypnout diagnostiku
-./r4dcb08-mqtt -p /dev/ttyUSB0 -H localhost -D 0
+# Background
+nohup ./r4dcb08-mqtt -c /etc/r4dcb08-mqtt.conf > /var/log/r4dcb08-mqtt.log 2>&1 &
 ```
 
-### Formát
+Note: Without systemd watchdog, use a supervisor with health checks for auto-restart on hang.
 
-Topic: `{prefix}/{address}/diagnostics`
+## Troubleshooting
 
-Payload (JSON, bez retain):
+### "Failed to open serial port"
+
+- Check device exists: `ls -la /dev/ttyUSB*`
+- Check permissions: user must be in `dialout` group (Linux) or `dialer` (FreeBSD)
+  ```bash
+  sudo usermod -a -G dialout $USER   # then logout/login
+  ```
+- Check if device is in use: `fuser /dev/ttyUSB0`
+
+### No temperature readings
+
+1. Test sensor with main r4dcb08 tool first:
+   ```bash
+   ../r4dcb08 -p /dev/ttyUSB0 -a 1
+   ```
+2. Check Modbus address matches sensor DIP switches (default: 1)
+3. Check wiring polarity (A+/B-)
+4. Try lower baudrate: `-b 4800`
+
+### MQTT connection fails
+
+- Test broker connectivity: `mosquitto_pub -h localhost -t test -m hello`
+- Check firewall: port 1883 (or 8883 for TLS)
+- For TLS issues, try `--tls-insecure` first to isolate cert problems
+
+### "NaN" values
+
+- Sensor not connected to that channel
+- Sensor cable too long or damaged
+- Try enabling median filter (`-m`) to filter out occasional bad reads
+
+### Daemon exits after 10 errors
+
+Serial or MQTT problems. Check logs:
+```bash
+journalctl -u r4dcb08-mqtt -n 50   # systemd
+tail -50 /var/log/r4dcb08-mqtt.log # manual
+```
+
+## Diagnostics
+
+Publishes JSON to `{prefix}/{address}/diagnostics` every N intervals:
+
 ```json
 {
   "uptime": 3600,
-  "reads": {
-    "total": 360,
-    "success": 358,
-    "failure": 2
-  },
+  "reads": {"total": 360, "success": 358, "failure": 2},
   "mqtt_reconnects": 1,
   "consecutive_errors": 0
 }
 ```
 
-| Pole | Typ | Popis |
-|------|-----|-------|
-| `uptime` | uint32 | Sekund od startu daemona |
-| `reads.total` | uint32 | Celkový počet pokusů o čtení |
-| `reads.success` | uint32 | Úspěšná čtení |
-| `reads.failure` | uint32 | Neúspěšná čtení |
-| `mqtt_reconnects` | uint32 | Počet MQTT rekonektů |
-| `consecutive_errors` | int | Aktuální počet po sobě jdoucích chyb |
+## Signals
 
-## Filtry
+| Signal | Action |
+|--------|--------|
+| SIGTERM, SIGINT | Graceful shutdown (responds within 1s) |
+| SIGHUP | Reserved for config reload (not implemented) |
+| SIGPIPE | Ignored |
 
-### Median filtr (`-m`)
+## Error Recovery
 
-Tříbodový median filtr pro odstranění náhodných špiček. Filtr udržuje poslední 3 hodnoty a vrací prostřední hodnotu.
+- MQTT disconnect: auto reconnect with backoff 1-60s
+- Serial read error: reopens port
+- 10 consecutive errors: daemon exits (let supervisor restart it)
 
-```bash
-./r4dcb08-mqtt -p /dev/ttyUSB0 -a 1 -H localhost -m
-```
+## Limitations
 
-### MAF filtr (`-M <size>`)
+- Max 8 temperature channels
+- Modbus address 1-254
+- Single sensor per daemon instance (run multiple daemons for multiple sensors)
 
-Moving Average Filter s lichoběžníkovými váhami. Velikost okna musí být liché číslo 3-15.
+## License
 
-```bash
-# MAF s oknem 5
-./r4dcb08-mqtt -p /dev/ttyUSB0 -a 1 -H localhost -M 5
-
-# Kombinace obou filtrů
-./r4dcb08-mqtt -p /dev/ttyUSB0 -a 1 -H localhost -m -M 7
-```
-
-Váhy: `[0.5, 1, 1, ..., 1, 0.5]`
-
-## Testování
-
-### Manuální test
-
-Terminal 1 - MQTT subscriber:
-```bash
-mosquitto_sub -h localhost -t "sensors/r4dcb08/#" -v
-```
-
-Terminal 2 - Daemon:
-```bash
-./r4dcb08-mqtt -p /dev/ttyUSB0 -a 1 -H localhost -I 5 -v
-```
-
-### Test reconnect
-
-```bash
-# Spustit daemon
-./r4dcb08-mqtt -p /dev/ttyUSB0 -a 1 -H localhost -v &
-
-# Restartovat broker
-sudo systemctl restart mosquitto
-
-# Daemon by se měl automaticky znovu připojit
-```
-
-### Test LWT
-
-```bash
-# Subscriber
-mosquitto_sub -h localhost -t "sensors/r4dcb08/1/status" -v
-
-# Spustit daemon a pak ho násilně ukončit
-./r4dcb08-mqtt -p /dev/ttyUSB0 -a 1 -H localhost &
-kill -9 $!
-
-# Mělo by se objevit "offline"
-```
-
-## Signály
-
-| Signál | Akce |
-|--------|------|
-| `SIGTERM` | Graceful shutdown |
-| `SIGINT` | Graceful shutdown (Ctrl+C) |
-| `SIGHUP` | (rezervováno pro reload konfigurace) |
-| `SIGPIPE` | Ignorován |
-
-## Chybové stavy
-
-Daemon se pokouší o automatické zotavení při:
-- Ztrátě MQTT spojení (exponenciální backoff 1-60s)
-- Chybě čtení ze sériového portu (reopen)
-
-Po 10 po sobě jdoucích chybách daemon ukončí činnost.
-
-## Architektura
-
-```
-┌─────────────────────────────────────────────────────┐
-│              r4dcb08-mqtt daemon                     │
-├─────────────────────────────────────────────────────┤
-│  mqtt_main.c      │  mqtt_client.c (libmosquitto)   │
-│  mqtt_config.c    │  mqtt_publish.c                 │
-│  mqtt_error.c     │  mqtt_metrics.c                 │
-├─────────────────────────────────────────────────────┤
-│  Znovupoužité moduly z r4dcb08:                     │
-│  serial.c  packet.c  monada.c  now.c                │
-│  median_filter.c  maf_filter.c  error.c             │
-└─────────────────────────────────────────────────────┘
-```
-
-### Soubory
-
-| Soubor | Popis |
-|--------|-------|
-| `mqtt_main.c` | Hlavní smyčka, daemonizace, signály |
-| `mqtt_config.c/h` | Parsování CLI a INI konfigurace |
-| `mqtt_error.c/h` | Logování (syslog/stderr), chybové kódy |
-| `mqtt_client.c/h` | Wrapper pro libmosquitto |
-| `mqtt_publish.c/h` | Čtení teplot a publikování |
-| `mqtt_metrics.c/h` | Diagnostické metriky |
-
-## Omezení
-
-- Single-threaded (kvůli statickým bufferům v `monada.c`)
-- Libmosquitto používá vlastní síťový thread (`mosquitto_loop_start`)
-- Maximálně 8 teplotních kanálů
-- Modbus adresa 1-254
-
-## Licence
-
-Stejná licence jako hlavní projekt r4dcb08.
-
-## Autor
-
-Generováno pomocí Claude Code.
+Same as main r4dcb08 project.

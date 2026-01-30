@@ -14,7 +14,10 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
+
+#ifdef USE_SYSTEMD
 #include <systemd/sd-daemon.h>
+#endif
 
 #include "mqtt_config.h"
 #include "mqtt_error.h"
@@ -237,7 +240,9 @@ static int daemon_loop(MqttConfig *config)
     mqtt_log_info("Daemon started, interval=%d s", config->interval);
 
     /* Notify systemd we are ready */
+#ifdef USE_SYSTEMD
     sd_notify(0, "READY=1");
+#endif
 
     /* Main loop */
     while (running) {
@@ -290,8 +295,6 @@ static int daemon_loop(MqttConfig *config)
             mqtt_metrics_read_success(&metrics);
             consecutive_errors = 0;
             mqtt_metrics_set_consecutive_errors(&metrics, 0);
-            /* Notify systemd watchdog on successful operation */
-            sd_notify(0, "WATCHDOG=1");
         }
 
         /* Publish diagnostics every N intervals */
@@ -303,9 +306,14 @@ static int daemon_loop(MqttConfig *config)
             }
         }
 
-        /* Sleep for interval */
-        if (running) {
-            ts.tv_sec = config->interval;
+        /* Notify systemd watchdog on each iteration */
+#ifdef USE_SYSTEMD
+        sd_notify(0, "WATCHDOG=1");
+#endif
+
+        /* Sleep for interval, checking for shutdown every second */
+        for (int i = 0; i < config->interval && running; i++) {
+            ts.tv_sec = 1;
             ts.tv_nsec = 0;
             nanosleep(&ts, NULL);
         }
@@ -315,7 +323,9 @@ static int daemon_loop(MqttConfig *config)
     mqtt_log_info("Shutting down...");
 
     /* Notify systemd we are stopping */
+#ifdef USE_SYSTEMD
     sd_notify(0, "STOPPING=1");
+#endif
 
     /* Publish offline status before disconnecting */
     if (mqtt_client_is_connected(&client)) {

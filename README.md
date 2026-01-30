@@ -212,6 +212,26 @@ Normally you only need `-b` if default 9600 doesn't work. Use `-x` only when you
 - Press Ctrl+C to stop continuous measurements
 - Multiple devices can share one RS485 bus using different addresses
 
+## MQTT Daemon
+
+For continuous monitoring and integration with home automation systems, there's a separate MQTT daemon that publishes temperature readings to an MQTT broker.
+
+**Features:**
+- Publishes temperatures to MQTT broker (Mosquitto, etc.)
+- TLS/SSL support
+- Runs as systemd service or standalone
+- Auto-reconnect, LWT for offline detection
+- Works on systems without systemd (Alpine, FreeBSD)
+
+**Quick example:**
+```bash
+cd mqtt_daemon
+make
+./r4dcb08-mqtt -p /dev/ttyUSB0 -H mqtt.local -v
+```
+
+See [mqtt_daemon/README.md](mqtt_daemon/README.md) for full documentation.
+
 ## Changelog
 
 ### V1.13 (2026-01-28)

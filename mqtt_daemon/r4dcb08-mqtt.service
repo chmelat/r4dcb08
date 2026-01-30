@@ -9,7 +9,7 @@ Type=notify
 NotifyAccess=main
 ExecStart=/usr/local/bin/r4dcb08-mqtt -c /etc/r4dcb08-mqtt.conf
 ExecReload=/bin/kill -HUP $MAINPID
-WatchdogSec=30
+WatchdogSec=3600
 Restart=on-failure
 RestartSec=5
 
