@@ -263,6 +263,13 @@ static int daemon_loop(MqttConfig *config)
                     mqtt_log_error("Too many consecutive reconnect failures");
                     break;
                 }
+                /* Exponential backoff: 2, 4, 8, 16, 32, max 60 seconds */
+                int backoff = (2 << (consecutive_errors - 1));
+                if (backoff > 60) backoff = 60;
+                mqtt_log_info("Reconnect failed, retrying in %d seconds...", backoff);
+                for (int i = 0; i < backoff && running; i++) {
+                    sleep(1);
+                }
                 continue;
             }
             mqtt_metrics_reconnect(&metrics);
