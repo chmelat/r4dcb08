@@ -77,5 +77,11 @@ verbose = false
 median_filter = false
 
 # Enable Moving Average Filter (MAF) with trapezoidal weights
-# Set window size (odd number 3-15) to enable, or 0 to disable
-maf_window = 0
+maf_filter = false
+
+# MAF window size (odd number 3-15), used when maf_filter = true
+# maf_window = 5
+
+[diagnostics]
+# Publish diagnostic metrics every N measurement intervals (0 = disable)
+diagnostics_interval = 6
