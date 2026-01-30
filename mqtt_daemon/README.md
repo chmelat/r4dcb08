@@ -127,7 +127,7 @@ Password can also be set via `MQTT_PASSWORD` environment variable.
 | Option | Long | Description | Default |
 |--------|------|-------------|---------|
 | `-I` | `--interval` | Measurement interval [s] | `10` |
-| `-c` | `--config` | Config file path | - |
+| `-c` | `--config` | Config file path | none (`/etc/r4dcb08-mqtt.conf` for systemd) |
 | `-F` | `--pid-file` | PID file path | `/var/run/r4dcb08-mqtt.pid` |
 | `-d` | `--daemon` | Run as background daemon | no |
 | `-v` | `--verbose` | Verbose output | no |
