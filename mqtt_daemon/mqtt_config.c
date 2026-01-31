@@ -241,7 +241,9 @@ MqttStatus mqtt_config_parse_file(const char *filename, MqttConfig *config)
         } else if (strcmp(key, "topic") == 0 || strcmp(key, "topic_prefix") == 0) {
             strncpy(config->topic_prefix, value, MQTT_MAX_TOPIC - 1);
         } else if (strcmp(key, "client_id") == 0) {
-            strncpy(config->client_id, value, MQTT_MAX_CLIENT_ID - 1);
+            if (value[0] != '\0') {
+                strncpy(config->client_id, value, MQTT_MAX_CLIENT_ID - 1);
+            }
         } else if (strcmp(key, "qos") == 0) {
             if (mqtt_config_parse_int(value, &config->qos, 0, 2) != 0) {
                 mqtt_log_warning("Config line %d: invalid qos '%s'", line_num, value);
