@@ -16,26 +16,9 @@ WatchdogSec=3600
 Restart=on-failure
 RestartSec=5
 
-# Run as dedicated user (create with: useradd -r -s /usr/sbin/nologin r4dcb08)
-User=r4dcb08
-Group=r4dcb08
-SupplementaryGroups=dialout
-
-# Security hardening
-ReadWritePaths=/var/run
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-PrivateTmp=true
-ProtectKernelTunables=true
-ProtectControlGroups=true
-PrivateDevices=false
-
-# Allow access to serial devices
-DeviceAllow=/dev/ttyUSB* rw
-DeviceAllow=/dev/ttyACM* rw
-DeviceAllow=/dev/ttyAMA* rw
-DeviceAllow=/dev/serial* rw
+# Run as root (required for serial port access)
+User=root
+Group=root
 
 [Install]
 WantedBy=multi-user.target

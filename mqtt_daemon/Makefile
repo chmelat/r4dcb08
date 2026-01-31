@@ -91,10 +91,9 @@ install: $(PROGRAM)
 	install -m 644 r4dcb08-mqtt.service $(SYSTEMDDIR)/
 	systemctl daemon-reload
 	@echo ""
-	@echo "Done. Before starting the service:"
-	@echo "  1. Create user: sudo useradd -r -s /usr/sbin/nologin -G dialout r4dcb08"
-	@echo "  2. Fix config owner: sudo chown r4dcb08:r4dcb08 $(CONFDIR)/r4dcb08-mqtt.conf"
-	@echo "  3. Enable service: sudo systemctl enable --now r4dcb08-mqtt"
+	@echo "Done. To start the service:"
+	@echo "  1. Edit config: sudo nano $(CONFDIR)/r4dcb08-mqtt.conf"
+	@echo "  2. Enable service: sudo systemctl enable --now r4dcb08-mqtt"
 
 # Uninstall (requires root)
 uninstall:

@@ -80,11 +80,10 @@ Installs:
 - Config to `/etc/r4dcb08-mqtt.conf`
 - Systemd unit to `/usr/local/lib/systemd/system/`
 
-After install, create service user and start:
+After install, edit config and start:
 
 ```bash
-sudo useradd -r -s /usr/sbin/nologin -G dialout r4dcb08
-sudo chown r4dcb08:r4dcb08 /etc/r4dcb08-mqtt.conf
+sudo nano /etc/r4dcb08-mqtt.conf
 sudo systemctl enable --now r4dcb08-mqtt
 ```
 
@@ -248,7 +247,7 @@ sudo systemctl status r4dcb08-mqtt
 sudo journalctl -u r4dcb08-mqtt -f
 ```
 
-Security features: runs as dedicated `r4dcb08` user, read-only filesystem, access only to serial ports.
+Service runs as root for reliable serial port access.
 
 ## Running Without Systemd
 
