@@ -57,7 +57,7 @@ clean:
 
 # Source package
 dist:
-	tar czf $(PROGRAM)-$(VERSION).tgz $(SRC) $(HEAD) Makefile README.md
+	tar --exclude='*.o' --exclude='r4dcb08-mqtt' -czf $(PROGRAM)-$(VERSION).tgz $(SRC) $(HEAD) Makefile README.md LICENSE .gitignore doc/ mqtt_daemon/
 
 # Linked
 $(PROGRAM): $(OBJ) Makefile
