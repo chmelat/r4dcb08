@@ -1,8 +1,8 @@
 # Srovnávací analýza projektů R4DCB08
 
-**Datum:** 2026-01-21
+**Datum:** 2026-01-21 (aktualizace 2026-01-31)
 **Autor:** Code Review
-**Verze:** 1.0
+**Verze:** 1.1
 
 ---
 
@@ -10,7 +10,7 @@
 
 Tento dokument obsahuje kritické srovnání dvou implementací komunikační utility pro teplotní modul R4DCB08:
 
-- **Projekt A:** Lokální C implementace (r4dcb08, verze 1.9)
+- **Projekt A:** Lokální C implementace (r4dcb08, verze 1.13)
 - **Projekt B:** R4DCB08-Temperature-Collector (Rust, verze 0.4.0)
 
 Oba projekty implementují Modbus RTU protokol pro komunikaci s 8-kanálovým teplotním senzorem R4DCB08.
@@ -22,11 +22,11 @@ Oba projekty implementují Modbus RTU protokol pro komunikaci s 8-kanálovým te
 | Parametr | Projekt A (C) | Projekt B (Rust) |
 |----------|---------------|------------------|
 | Programovací jazyk | C (ANSI/POSIX) | Rust 2021 |
-| Verze | 1.9 | 0.4.0 |
+| Verze | 1.13 | 0.4.0 |
 | Licence | MIT | MIT / Apache-2.0 |
-| Název binárky | `r4dcb08` | `tempcol` |
-| Velikost binárky | ~100 KB | ~5-10 MB |
-| Závislosti | Žádné (stdlib) | 10+ crates |
+| Název binárky | `r4dcb08`, `r4dcb08-mqtt` | `tempcol` |
+| Velikost binárky | ~100 KB (cli), ~150 KB (mqtt) | ~5-10 MB |
+| Závislosti | libmosquitto (mqtt), libsystemd | 10+ crates |
 
 ---
 
@@ -43,14 +43,19 @@ Oba projekty implementují Modbus RTU protokol pro komunikaci s 8-kanálovým te
 | Korekce teplot (zápis) | ✓ | ✓ | |
 | Změna adresy zařízení | ✓ | ✓ | |
 | Změna baudrate | ✓ | ✓ | |
-| Skenování sběrnice | ✗ | ✓ | Pouze B |
-| Factory reset | ✗ | ✓ | Pouze B |
+| Skenování sběrnice | ✓ | ✓ | A: od v1.10 |
+| Factory reset | ✓ | ✓ | A: od v1.10 |
 | Automatic report | ✗ | ✓ | Pouze B |
-| Daemon režim | ✗ | ✓ | Pouze B |
-| MQTT publikace | ✗ | ✓ | Pouze B |
-| Mediánový filtr | ✓ | ✗ | Pouze A |
+| Daemon režim | ✓ | ✓ | A: r4dcb08-mqtt, B: daemon command |
+| MQTT publikace | ✓ | ✓ | A: r4dcb08-mqtt (libmosquitto), B: paho-mqtt |
+| TLS/SSL | ✓ | ✗ | A: r4dcb08-mqtt podporuje TLS |
+| Last Will (LWT) | ✓ | ✗ | Pouze A (r4dcb08-mqtt) |
+| Mediánový filtr | ✓ | ✗ | Pouze A (cli i mqtt) |
+| MAF filtr | ✓ | ✗ | Pouze A (klouzavý průměr) |
 | Volitelný timestamp | ✓ | ✗ | Pouze A (-f flag) |
 | Volitelný počet kanálů | ✓ | ✗ | Pouze A (-n flag) |
+| Systemd integrace | ✓ | ✗ | A: notify + watchdog |
+| Diagnostika | ✓ | ✗ | A: JSON metriky přes MQTT |
 
 ### 3.2 Příkazová řádka
 
@@ -81,18 +86,29 @@ r4dcb08/
 ├── config.c/.h         # Konfigurace programu
 ├── error.c/.h          # Chybové kódy
 ├── median_filter.c/.h  # 3-bodový mediánový filtr
+├── maf_filter.c/.h     # MAF filtr (klouzavý průměr)
 ├── signal_handler.c/.h # POSIX signály
 ├── read_functions.c/.h # Čtení z registrů
 ├── write_functions.c/.h# Zápis do registrů
+├── scan.c/.h           # Skenování RS485 sběrnice
 ├── now.c/.h            # Časové funkce
 ├── monada.c/.h         # Pomocné funkce
-└── Makefile
+├── Makefile
+└── mqtt_daemon/        # MQTT daemon (od v1.10)
+    ├── mqtt_main.c     # Daemon hlavní smyčka
+    ├── mqtt_client.c/h # libmosquitto wrapper
+    ├── mqtt_publish.c/h# Publikace teplot
+    ├── mqtt_config.c/h # INI parser + CLI
+    ├── mqtt_metrics.c/h# Diagnostika
+    ├── mqtt_error.c/h  # Error handling
+    └── Makefile
 ```
 
 **Charakteristika:**
 - Procedurální přístup
 - Vlastní implementace Modbus RTU
-- Minimální závislosti
+- MQTT daemon jako samostatná binárka
+- Závislosti: libmosquitto (mqtt), libsystemd (volitelné)
 - POSIX kompatibilita
 
 ### 4.2 Projekt B (Rust)
@@ -180,40 +196,45 @@ R4DCB08-Temperature-Collector/
    - 3-bodový mediánový filtr pro odstranění špiček
    - Užitečné pro zašuměná měření
 
-2. **Volitelný počet kanálů (-n)**
+2. **MAF filtr (-M)**
+   - Moving Average Filter (klouzavý průměr)
+   - Okno 3-15 vzorků s trapezoidálními váhami
+
+3. **Volitelný počet kanálů (-n)**
    - Čtení pouze potřebných kanálů
    - Efektivnější komunikace
 
-3. **Výstup bez timestamp (-f)**
+4. **Výstup bez timestamp (-f)**
    - Jednořádkový výstup pro skripty
    - Snadné parsování
 
-4. **Konfigurovatelný interval (-t)**
-   - Přesně definovaný interval měření
+5. **TLS/SSL podpora (mqtt daemon)**
+   - CA certifikát, klientský certifikát + klíč
+   - Volitelné přeskočení verifikace
+
+6. **Last Will and Testament (LWT)**
+   - Broker automaticky publikuje "offline" při výpadku
+
+7. **Systemd integrace**
+   - sd_notify(), watchdog
+   - Profesionální služba pro produkční nasazení
+
+8. **MQTT diagnostika**
+   - JSON metriky: uptime, počet čtení, chyby, reconnecty
 
 ### 7.2 Pouze v Projektu B
 
 1. **Modbus TCP**
    - Komunikace přes Ethernet/WiFi
 
-2. **MQTT integrace**
-   - Publikace do MQTT brokeru
-   - IoT ready
+2. **Automatic report**
+   - Konfigurace automatického reportování zařízení
 
-3. **Daemon režim**
-   - Dlouhodobý běh na pozadí
+3. **Knihovní API**
+   - Použitelné jako závislost v jiných Rust projektech
 
-4. **Factory reset**
-   - Obnovení továrního nastavení
-
-5. **Bus scan**
-   - Automatické vyhledání zařízení
-
-6. **Automatic report**
-   - Konfigurace automatického reportování
-
-7. **Knihovní API**
-   - Použitelné jako závislost v jiných projektech
+4. **Async/await podpora**
+   - Tokio runtime pro asynchronní operace
 
 ---
 
@@ -258,20 +279,31 @@ R4DCB08-Temperature-Collector/
 
 | Aspekt | Vítěz | Odůvodnění |
 |--------|-------|------------|
-| Jednoduchost | A | Minimální závislosti, snadná kompilace |
-| Funkcionalita | B | TCP, MQTT, daemon, factory reset |
+| Jednoduchost CLI | A | Minimální závislosti pro základní operace |
+| Funkcionalita | A | MQTT+TLS+LWT+filtry+diagnostika+systemd |
+| Modbus TCP | B | Pouze B podporuje TCP transport |
 | Výkon | A | Menší binárka, rychlejší start |
 | Bezpečnost kódu | B | Rust memory safety |
 | Testování | B | Automatizované testy |
 | Praktičnost (embedded) | A | Nízké nároky na zdroje |
-| Praktičnost (IoT) | B | MQTT, TCP |
-| Flexibilita výstupu | A | Volba kanálů, formát |
+| Praktičnost (IoT) | A | MQTT s TLS, LWT, diagnostika |
+| Flexibilita výstupu | A | Volba kanálů, formát, filtry |
+| Produkční nasazení | A | Systemd integrace, watchdog |
 
 **Celkové hodnocení:**
 
-Oba projekty jsou kvalitní implementace pro své účely. Projekt A (C) je optimalizován pro jednoduchost, nízké nároky na zdroje a praktické použití v shellových skriptech. Projekt B (Rust) je komplexnější řešení vhodné pro IoT aplikace a jako knihovna pro další vývoj.
+Od verze 1.10 projekt A (C) výrazně rozšířil svou funkcionalitu a nyní nabízí:
+- Kompletní MQTT daemon s TLS podporou
+- Last Will and Testament pro detekci výpadků
+- Dva typy filtrů (median + MAF)
+- Systemd integraci s watchdog
+- MQTT diagnostiku v JSON formátu
 
-Pro většinu případů použití na embedded Linux systémech (jako Orange Pi) je Projekt A plně dostačující a nabízí unikátní funkce (mediánový filtr, flexibilní výstup), které Projekt B postrádá.
+Projekt B (Rust) si zachovává výhodu v podpoře Modbus TCP a jako knihovna pro další Rust projekty. Nabízí také lepší memory safety díky Rust.
+
+**Pro embedded Linux systémy (Orange Pi, Raspberry Pi) je projekt A nyní komplexnějším řešením** s profesionálními funkcemi pro produkční IoT nasazení, zatímco projekt B je vhodnější pro projekty vyžadující Modbus TCP nebo integraci do Rust ekosystému.
+
+Viz také: `mqtt_comparison.md` pro detailní srovnání MQTT implementací.
 
 ---
 
