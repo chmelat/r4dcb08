@@ -12,6 +12,7 @@ NotifyAccess=main
 ExecStart=/usr/local/bin/r4dcb08-mqtt -c /etc/r4dcb08-mqtt.conf
 ExecReload=/bin/kill -HUP $MAINPID
 TimeoutStartSec=120
+TimeoutStopSec=10
 WatchdogSec=3600
 Restart=on-failure
 RestartSec=5

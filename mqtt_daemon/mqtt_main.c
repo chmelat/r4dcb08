@@ -1,6 +1,6 @@
 /*
  * R4DCB08 MQTT daemon main entry point
- * V1.1/2026-01-29
+ * V1.2/2026-02-02
  *
  * Reads temperatures from R4DCB08 sensor via Modbus RTU
  * and publishes to MQTT broker using libmosquitto.
@@ -27,7 +27,7 @@
 
 /* Program name for logging */
 #define PROGRAM_NAME "r4dcb08-mqtt"
-#define PROGRAM_VERSION "1.1"
+#define PROGRAM_VERSION "1.2"
 
 /* Global flag for graceful shutdown */
 static volatile sig_atomic_t running = 1;
@@ -322,7 +322,9 @@ static int daemon_loop(MqttConfig *config)
         for (int i = 0; i < config->interval && running; i++) {
             ts.tv_sec = 1;
             ts.tv_nsec = 0;
-            nanosleep(&ts, NULL);
+            if (nanosleep(&ts, NULL) == -1 && errno == EINTR) {
+                break;  /* Interrupted by signal, check running flag */
+            }
         }
     }
 
