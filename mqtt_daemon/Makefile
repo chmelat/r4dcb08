@@ -37,10 +37,10 @@ $(PROGRAM): $(OBJ)
 	$(CC) $(OBJ) $(LIBS) -o $(PROGRAM)
 
 # MQTT daemon sources
-mqtt_main.o: mqtt_main.c
+mqtt_main.o: mqtt_main.c mqtt_revision.h
 	$(CC) $(CFLAGS) $(OPT) -c $< -o $@
 
-mqtt_config.o: mqtt_config.c
+mqtt_config.o: mqtt_config.c mqtt_revision.h
 	$(CC) $(CFLAGS) $(OPT) -c $< -o $@
 
 mqtt_error.o: mqtt_error.c

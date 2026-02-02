@@ -144,6 +144,13 @@ Password can also be set via `MQTT_PASSWORD` environment variable.
 |--------|------|-------------|---------|
 | `-D` | `--diagnostics-interval` | Publish every N intervals (0=disable) | `6` |
 
+### Other
+
+| Option | Long | Description |
+|--------|------|-------------|
+| `-h` | `--help` | Show help |
+| `-V` | `--version` | Show version |
+
 ## Config File
 
 INI format, CLI options override config values.

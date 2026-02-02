@@ -21,13 +21,14 @@
 
 #include "mqtt_config.h"
 #include "mqtt_error.h"
+#include "mqtt_revision.h"
 #include "mqtt_client.h"
 #include "mqtt_publish.h"
 #include "mqtt_metrics.h"
 
 /* Program name for logging */
 #define PROGRAM_NAME "r4dcb08-mqtt"
-#define PROGRAM_VERSION "1.2"
+#define PROGRAM_VERSION MQTT_VERSION
 
 /* Global flag for graceful shutdown */
 static volatile sig_atomic_t running = 1;

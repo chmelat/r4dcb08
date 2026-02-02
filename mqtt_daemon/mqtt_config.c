@@ -12,6 +12,7 @@
 #include <limits.h>
 #include "mqtt_config.h"
 #include "mqtt_error.h"
+#include "mqtt_revision.h"
 
 /* Long options for getopt */
 static struct option long_options[] = {
@@ -407,7 +408,7 @@ MqttStatus mqtt_config_parse_args(int argc, char *argv[], MqttConfig *config)
                 config->tls_insecure = 1;
                 break;
             case 'V':
-                printf("r4dcb08-mqtt version 1.1\n");
+                printf("r4dcb08-mqtt version %s (%s)\n", MQTT_VERSION, MQTT_REVDATE);
                 exit(0);
             case 'h':
             default:
