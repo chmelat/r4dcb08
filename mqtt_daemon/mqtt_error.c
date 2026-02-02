@@ -1,6 +1,6 @@
 /*
  * MQTT daemon error handling and logging
- * V1.0/2026-01-29
+ * V1.1/2026-02-02
  */
 #include <stdio.h>
 #include <stdarg.h>
@@ -39,7 +39,8 @@ static void log_message(int priority, const char *prefix, const char *format, va
         syslog(priority, "%s", buffer);
     } else {
         time_t now = time(NULL);
-        struct tm *tm_info = localtime(&now);
+        struct tm tm_buf;
+        struct tm *tm_info = localtime_r(&now, &tm_buf);
         char time_buf[32];
         strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", tm_info);
 
