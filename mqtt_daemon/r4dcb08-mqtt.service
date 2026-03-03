@@ -1,7 +1,8 @@
 [Unit]
 Description=R4DCB08 Temperature Sensor MQTT Publisher
-After=network-online.target mosquitto.service
+After=network-online.target mosquitto.service dev-ttyUSB0.device
 Wants=network-online.target mosquitto.service
+BindsTo=dev-ttyUSB0.device
 StartLimitIntervalSec=300
 StartLimitBurst=5
 ConditionPathExists=/etc/r4dcb08-mqtt.conf
