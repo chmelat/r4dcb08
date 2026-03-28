@@ -3,8 +3,7 @@ Description=R4DCB08 Temperature Sensor MQTT Publisher
 After=network-online.target mosquitto.service dev-ttyUSB0.device
 Wants=network-online.target mosquitto.service
 BindsTo=dev-ttyUSB0.device
-StartLimitIntervalSec=300
-StartLimitBurst=5
+StartLimitIntervalSec=0
 ConditionPathExists=/etc/r4dcb08-mqtt.conf
 
 [Service]
@@ -16,7 +15,7 @@ TimeoutStartSec=120
 TimeoutStopSec=10
 WatchdogSec=3600
 Restart=on-failure
-RestartSec=5
+RestartSec=30
 
 # Run as root (required for serial port access)
 User=root
